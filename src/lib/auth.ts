@@ -1,0 +1,32 @@
+import "server-only";
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { db, schema } from "@/lib/db";
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user: schema.user,
+      session: schema.session,
+      account: schema.account,
+      verification: schema.verification,
+    },
+  }),
+  emailAndPassword: { enabled: true, minPasswordLength: 8 },
+  plugins: [nextCookies()],
+});
+
+export async function getUser() {
+  const s = await auth.api.getSession({ headers: await headers() });
+  return s?.user ?? null;
+}
+
+export async function requireUser() {
+  const user = await getUser();
+  if (!user) redirect("/sign-in");
+  return user;
+}
