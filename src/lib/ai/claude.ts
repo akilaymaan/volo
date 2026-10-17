@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
+import { recordUsage } from "@/lib/usage";
 
 export const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 // The live interviewer is latency-sensitive (the candidate waits on every reply), so it runs on Haiku
@@ -44,6 +45,11 @@ export async function structured<S extends z.ZodType>(
       format: betaZodOutputFormat(schema),
     },
     ...fallback,
+  });
+  await recordUsage(res.model, {
+    inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens,
+    cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: res.usage.cache_creation_input_tokens ?? 0,
   });
 
   if (res.stop_reason === "refusal") throw new Error("Claude declined this request");

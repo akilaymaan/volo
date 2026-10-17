@@ -15,7 +15,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/recordings/[id]
     headers: {
       "content-type": rec.mime,
       "content-length": String(rec.data.length),
-      "cache-control": "private, max-age=3600",
+      "cache-control": "private, no-store",
       "x-content-type-options": "nosniff",
     },
   });

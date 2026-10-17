@@ -22,6 +22,27 @@
       "when": 1791878549787,
       "tag": "0002_review_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792264194002,
+      "tag": "0003_production_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792264505890,
+      "tag": "0004_email_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792264836287,
+      "tag": "0005_usage_and_retention_indexes",
+      "breakpoints": true
     }
   ]
 }

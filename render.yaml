@@ -1,0 +1,26 @@
+# Alternative full Next.js host, not a standalone API backend.
+# No pre-deploy/start migrations: use an approved, separate migration process.
+services:
+  - type: web
+    name: volo
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start -- --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /sign-in
+    envVars:
+      - key: NODE_VERSION
+        value: 24.13.0
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_MODE
+        value: postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: BETTER_AUTH_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false

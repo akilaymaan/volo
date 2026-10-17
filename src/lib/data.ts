@@ -1,9 +1,11 @@
 import "server-only";
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { analyzeTranscript, generateInsights } from "@/lib/ai/tasks";
 import { db } from "@/lib/db";
-import { feedback, type Interview, interview, interviewer, response } from "@/lib/db/schema";
+import { feedback, type Interview, interview, interviewer, invitation, response } from "@/lib/db/schema";
+import { withUsage } from "@/lib/usage";
+import { SILENCE_MARKER } from "@/lib/ai/prompts";
 
 export async function listInterviews(userId: string) {
   return db
@@ -82,20 +84,30 @@ export async function runAnalysis(responseId: string) {
     .innerJoin(interview, eq(response.interviewId, interview.id))
     .where(eq(response.id, responseId));
   if (!row) return;
-  const { response: r, interview: iv } = row;
+  const { response: r } = row;
+  if (r.status !== "completed") return;
+  const iv = { ...row.interview, ...r.interviewSnapshot };
+  const startedAt = new Date();
+  const [claimed] = await db.update(response).set({ analysisStatus: "running", analysisStartedAt: startedAt })
+    .where(and(eq(response.id, r.id), eq(response.status, "completed"), or(
+      eq(response.analysisStatus, "pending"), eq(response.analysisStatus, "failed"),
+      and(eq(response.analysisStatus, "running"), lt(response.analysisStartedAt, new Date(Date.now() - 300_000))),
+    ))).returning({ id: response.id });
+  if (!claimed) return;
+  const currentRun = and(eq(response.id, r.id), eq(response.analysisStartedAt, startedAt));
 
-  if (!r.transcript.some((t) => t.role === "user")) {
-    await db.update(response).set({ analysisStatus: "done", analytics: null }).where(eq(response.id, r.id));
+  if (!r.transcript.some((t) => t.role === "user" && t.text !== SILENCE_MARKER)) {
+    await db.update(response).set({ analysisStatus: "done", analytics: null }).where(currentRun);
     return;
   }
-  await db.update(response).set({ analysisStatus: "running", analysisStartedAt: new Date() }).where(eq(response.id, r.id));
   try {
-    const persona = await getInterviewer(iv.interviewerId);
-    const analytics = await analyzeTranscript(iv, r.transcript, persona?.name ?? "Interviewer");
-    await db.update(response).set({ analytics, analysisStatus: "done" }).where(eq(response.id, r.id));
+    const persona = r.interviewSnapshot?.persona ?? await getInterviewer(iv.interviewerId);
+    const analytics = await withUsage({ accountId: iv.ownerId, responseId: r.id, operation: "analysis" },
+      () => analyzeTranscript(iv, r.transcript, persona?.name ?? "Interviewer"));
+    await db.update(response).set({ analytics, analysisStatus: "done" }).where(currentRun);
   } catch (err) {
-    console.error("[analysis] failed", r.id, err);
-    await db.update(response).set({ analysisStatus: "failed" }).where(eq(response.id, r.id));
+    console.error("[analysis] failed", { responseId: r.id, type: err instanceof Error ? err.name : "unknown" });
+    await db.update(response).set({ analysisStatus: "failed" }).where(currentRun);
   }
 }
 
@@ -104,25 +116,27 @@ export async function runAnalysis(responseId: string) {
  * Returns the ids that need analysis.
  */
 export async function finalizeStale(iv: Interview) {
-  const cutoff = new Date(Date.now() - (iv.durationMins + 15) * 60_000);
+  const duration = sql`coalesce((${response.interviewSnapshot}->>'durationMins')::int, ${iv.durationMins})`;
   const rows = await db
     .update(response)
     .set({
       status: "completed",
       endedAt: new Date(),
-      analysisStatus: "running",
+      analysisStatus: "pending",
       analysisStartedAt: new Date(),
-      durationSec: sql`least(extract(epoch from now() - ${response.createdAt})::int, ${iv.durationMins * 60})`,
+      durationSec: sql`least(extract(epoch from now() - ${response.createdAt})::int, ${duration} * 60)`,
     })
     .where(
       and(
         eq(response.interviewId, iv.id),
         eq(response.status, "in_progress"),
-        lt(response.createdAt, cutoff),
-        sql`jsonb_array_length(${response.transcript}) > 1`,
+        lt(response.createdAt, sql`now() - ((${duration} + 15) * interval '1 minute')`),
       ),
     )
-    .returning({ id: response.id });
+    .returning({ id: response.id, invitationId: response.invitationId });
+  const inviteIds = rows.flatMap((r) => r.invitationId ? [r.invitationId] : []);
+  if (inviteIds.length) await db.update(invitation).set({ status: "completed" })
+    .where(and(inArray(invitation.id, inviteIds), isNull(invitation.revokedAt)));
   return rows.map((r) => r.id);
 }
 
@@ -149,18 +163,26 @@ export async function interviewStats(interviewId: string) {
 
 export async function refreshInsights(interviewId: string) {
   const [iv] = await db.select().from(interview).where(eq(interview.id, interviewId));
-  const rows = (await listResponses(interviewId))
-    .filter((r) => r.analytics)
-    .slice(0, 60)
+  const candidates = (await listResponses(interviewId))
+    .filter((r) => r.analytics?.overallScore != null)
+    .slice(0, 60);
+  const rows = candidates
     .map((r) => ({
       summary: r.analytics!.callSummary,
-      score: r.analytics!.overallScore,
+      score: r.analytics!.overallScore!,
       recommendation: r.analytics!.recommendation,
     }));
   if (!iv || rows.length === 0) return;
-  const insights = await generateInsights(iv, rows);
-  await db
-    .update(interview)
-    .set({ insights, insightsUpdatedAt: new Date() })
-    .where(eq(interview.id, interviewId));
+  const insights = await withUsage({ accountId: iv.ownerId, operation: "insights" },
+    () => generateInsights(iv, rows));
+  await db.transaction(async (tx) => {
+    // Deletion also clears this interview row. Lock it before checking sources so
+    // a concurrently erased candidate cannot reappear in cached AI insights.
+    const [current] = await tx.select().from(interview).where(eq(interview.id, interviewId)).for("update");
+    if (!current || current.objective !== iv.objective) return;
+    const remaining = await tx.select({ id: response.id }).from(response)
+      .where(inArray(response.id, candidates.map((r) => r.id)));
+    if (remaining.length !== candidates.length) return;
+    await tx.update(interview).set({ insights, insightsUpdatedAt: new Date() }).where(eq(interview.id, interviewId));
+  });
 }

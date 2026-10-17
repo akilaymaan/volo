@@ -12,7 +12,7 @@ const Body = z.object({
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return json({ error: "Invalid request" }, 400);
-  const call = await loadCall(parsed.data.responseId);
+  const call = await loadCall(parsed.data.responseId, req);
   if (!call || call.response.status !== "completed") return json({ error: "Not found" }, 404);
   // One rating per interview attempt
   await db.insert(feedback).values({

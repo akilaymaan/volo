@@ -2,10 +2,14 @@ import { ArrowLeftIcon, LightbulbIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { after } from "next/server";
 import { Suspense } from "react";
+import { eq } from "drizzle-orm";
 import { refreshInsightsAction } from "@/app/actions";
 import { ActionButton } from "@/components/action-button";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { InterviewActions } from "@/components/interview-actions";
+import { InvitationManager } from "@/components/invitation-manager";
+import { db } from "@/lib/db";
+import { invitation } from "@/lib/db/schema";
 import { type ResponseRow, ResponsesTable } from "@/components/responses-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PersonaDot } from "@/components/voice-orb";
@@ -68,6 +72,10 @@ export default async function InterviewPage(props: PageProps<"/dashboard/intervi
     isViewed: r.isViewed,
   }));
   const analyzing = rows.some((r) => r.analysisStatus === "running");
+  const invites = await db.select({
+    id: invitation.id, email: invitation.email, status: invitation.status,
+    expiresAt: invitation.expiresAt, revokedAt: invitation.revokedAt, sendCount: invitation.sendCount,
+  }).from(invitation).where(eq(invitation.interviewId, id));
   const analyzed = rows.filter((r) => r.score != null).length;
   const completionRate = stats.started ? Math.round((stats.completed / stats.started) * 100) : null;
 
@@ -88,7 +96,7 @@ export default async function InterviewPage(props: PageProps<"/dashboard/intervi
           </div>
         </div>
         <Suspense>
-          <InterviewActions id={iv.id} isActive={iv.isActive} />
+          <InterviewActions id={iv.id} isActive={iv.isActive} invitationOnly={iv.invitationOnly || !!iv.allowedEmails.length} />
         </Suspense>
       </div>
 
@@ -112,11 +120,29 @@ export default async function InterviewPage(props: PageProps<"/dashboard/intervi
           <TabsTrigger value="responses">Candidates</TabsTrigger>
           <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="questions">Questions</TabsTrigger>
+          {!iv.isAnonymous && <TabsTrigger value="invitations">Invitations</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="responses" className="mt-4">
           <ResponsesTable interviewId={iv.id} rows={rows} />
+          {responses.length >= 2 && <form action={`/dashboard/interviews/${iv.id}/compare`} className="mt-6 rounded-2xl border bg-card p-5">
+            <h2 className="font-semibold">Compare candidates</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Choose 2–4 reports from this interview. Different question/rubric versions cannot be compared.</p>
+            <div className="my-4 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
+              {responses.filter((r) => r.analytics).map((r) => <label key={r.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="candidate" value={r.id} /> {r.name || "Anonymous candidate"}
+              </label>)}
+            </div>
+            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Compare selected</button>
+          </form>}
         </TabsContent>
+
+        {!iv.isAnonymous && <TabsContent value="invitations" className="mt-4">
+          <InvitationManager interviewId={iv.id} rows={invites.map((r) => ({
+            id: r.id, email: r.email, status: !r.revokedAt && r.expiresAt < new Date() && !["started", "completed"].includes(r.status) ? "expired" : r.status,
+            expiresAt: r.expiresAt.toISOString(), revoked: !!r.revokedAt, sendCount: r.sendCount,
+          }))} />
+        </TabsContent>}
 
         <TabsContent value="insights" className="mt-4">
           <div className="rounded-2xl border bg-card p-5 sm:p-6">

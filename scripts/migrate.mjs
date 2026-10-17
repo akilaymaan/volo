@@ -1,28 +1,23 @@
-// Applies SQL migrations in ./drizzle to DATABASE_URL, or to the local embedded database.
-// Runs before `dev`, `build` and `start`, so a fresh clone needs no manual DB step.
+// Explicit migration entry point. Build/start/dev never execute this script.
 import nextEnv from "@next/env";
+import { DatabaseConfigError } from "../src/lib/db/config.mjs";
+import { migrateLocalDatabase, migratePostgresDatabase } from "./database-migrations.mjs";
 
 nextEnv.loadEnvConfig(process.cwd()); // same .env / .env.local resolution as Next
 
-const url = process.env.DATABASE_URL;
-const migrationsFolder = "drizzle";
-
-if (url) {
-  const { default: postgres } = await import("postgres");
-  const { drizzle } = await import("drizzle-orm/postgres-js");
-  const { migrate } = await import("drizzle-orm/postgres-js/migrator");
-  const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
-  await migrate(drizzle(sql), { migrationsFolder });
-  await sql.end();
-  console.log("✓ database migrated (DATABASE_URL)");
-} else {
-  const { PGlite } = await import("@electric-sql/pglite");
-  const { drizzle } = await import("drizzle-orm/pglite");
-  const { migrate } = await import("drizzle-orm/pglite/migrator");
-  const dir = process.env.PGLITE_DIR || ".data/pglite";
-  (await import("node:fs")).mkdirSync(dir, { recursive: true });
-  const client = new PGlite(dir);
-  await migrate(drizzle(client), { migrationsFolder });
-  await client.close();
-  console.log(`✓ database migrated (embedded Postgres at ${dir})`);
+try {
+  const args = process.argv.slice(2);
+  if (args.length > 1 || (args.length === 1 && args[0] !== "--local"))
+    throw new DatabaseConfigError("Usage: npm run db (PostgreSQL) or npm run db:local (explicit PGlite).");
+  if (args[0] === "--local") {
+    await migrateLocalDatabase(process.env);
+    console.log("Local PGlite migrations applied.");
+  } else {
+    await migratePostgresDatabase(process.env.DATABASE_URL);
+    console.log("PostgreSQL migrations applied.");
+  }
+} catch (error) {
+  // Driver errors may contain connection details. Do not print their message/stack.
+  console.error(error instanceof DatabaseConfigError ? error.message : "Database migration failed. Check connectivity, TLS, database permissions and migration SQL. Connection details were not logged.");
+  process.exitCode = 1;
 }

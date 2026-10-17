@@ -29,6 +29,8 @@ export default async function EditInterview(props: PageProps<"/dashboard/intervi
           themeColor: iv.themeColor,
           logoUrl: iv.logoUrl ?? "",
           allowedEmails: iv.allowedEmails,
+          invitationOnly: iv.invitationOnly,
+          retentionDays: iv.retentionDays,
         }}
       />
     </>

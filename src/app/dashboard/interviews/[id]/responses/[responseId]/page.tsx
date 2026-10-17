@@ -13,6 +13,7 @@ import { analysisState, fmtDuration } from "@/lib/format";
 import { db } from "@/lib/db";
 import { response as responseTable } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { RUBRIC } from "@/lib/evaluation";
 
 // Covers analyses and insights started from this page via after() / server actions
 export const maxDuration = 300;
@@ -40,7 +41,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
   const { response: r, interview: iv } = await getOwnedResponse(responseId, user.id);
   if (iv.id !== id) notFound();
   if (!r.isViewed) await db.update(responseTable).set({ isViewed: true }).where(eq(responseTable.id, r.id));
-  const persona = await getInterviewer(iv.interviewerId);
+  const persona = r.interviewSnapshot?.persona ?? await getInterviewer(iv.interviewerId);
   const a = r.analytics;
   const state = analysisState(r);
   const analyzing = state === "running";
@@ -74,6 +75,18 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
         />
       </div>
 
+      <p className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+        AI assessment — human review required. Verify the transcript and evidence before any hiring decision.
+        Scores reflect demonstrated job-relevant answers, not a complete measure of ability.
+        Tab changes are not proof of misconduct.
+        {a && !a.rubricVersion && " This is a legacy assessment without the evidence-backed rubric. Re-analyze to upgrade."}
+        {!r.interviewSnapshot && " No historical interview snapshot exists; any re-analysis uses the current interview configuration."}
+      </p>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Consent: {r.consentedAt ? `${r.consentVersion}, ${r.consentedAt.toISOString()}` : "Not recorded (legacy response)"}.
+        Retention: {r.deleteAfter ? `scheduled for deletion after ${r.deleteAfter.toLocaleDateString()}` : "not scheduled (legacy response)"}.
+        Access: {r.invitationId ? "personal email invitation (possession of link, not identity verification)" : "public link; candidate identity is self-reported"}.
+      </p>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           {analyzing ? (
@@ -99,7 +112,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
               <Card>
                 <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                   <div className="flex justify-center gap-6">
-                    <ScoreRing score={a.overallScore} label="Overall" />
+                    {a.overallScore === null ? <p className="self-center text-sm text-muted-foreground">Insufficient evidence for an overall score</p> : <ScoreRing score={a.overallScore} label="Overall" />}
                     <ScoreRing score={a.communication.score} max={10} label="Communication" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -151,6 +164,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
               </Card>
 
               <Card title="Question by question">
+                <p className="mb-4 text-xs text-muted-foreground">{RUBRIC}</p>
                 <ol className="space-y-5">
                   {a.questionSummaries.map((q, i) => (
                     <li key={`${i}-${q.question}`} className="flex gap-3">
@@ -161,6 +175,14 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
                           {STATUS_CHIP[q.status].label}
                         </span>
                         {q.summary && <p className="mt-2 text-muted-foreground">{q.summary}</p>}
+                        {a.rubricVersion && <p className="mt-2 font-medium">Rubric score: {q.score == null ? "Not assessed" : `${q.score} / 4`}</p>}
+                        {q.evidence?.map((e, index) => (
+                          <a key={index} href={`#turn-${e.turnIndex}`} className="mt-2 block text-sm underline underline-offset-4">
+                            &ldquo;{e.quote}&rdquo; — transcript turn {e.turnIndex + 1}
+                          </a>
+                        ))}
+                        {!!q.strengths?.length && <p className="mt-2 text-sm">Strengths: {q.strengths.join("; ")}</p>}
+                        {!!q.improvements?.length && <p className="mt-2 text-sm">Improve: {q.improvements.join("; ")}</p>}
                       </div>
                     </li>
                   ))}
@@ -184,7 +206,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
             ) : (
               <ol className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
                 {r.transcript.map((t, i) => (
-                  <li key={i} className="flex gap-2.5">
+                  <li key={i} id={`turn-${i}`} className="flex scroll-mt-8 gap-2.5">
                     {t.role === "agent" && persona ? (
                       <PersonaDot color={persona.color} name={persona.name} size={26} />
                     ) : (

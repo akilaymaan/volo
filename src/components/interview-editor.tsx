@@ -70,6 +70,8 @@ export function InterviewEditor({
       themeColor: THEME_COLORS[0],
       logoUrl: "",
       allowedEmails: [],
+      invitationOnly: false,
+      retentionDays: 90,
     },
   );
   const set = <K extends keyof InterviewInput>(k: K, val: InterviewInput[K]) =>
@@ -429,11 +431,14 @@ export function InterviewEditor({
                 Don&apos;t ask candidates for their name and email. Useful for surveys and practice rounds.
               </p>
             </div>
-            <Switch id="anon" checked={v.isAnonymous} onCheckedChange={(x) => set("isAnonymous", x)} />
+            <Switch id="anon" checked={v.isAnonymous} onCheckedChange={(x) => setV((p) => ({ ...p, isAnonymous: x, invitationOnly: x ? false : p.invitationOnly }))} />
           </div>
           {!v.isAnonymous && (
             <div className="space-y-1.5">
-              <Label htmlFor="emails">Invite list (optional)</Label>
+              <Label htmlFor="invite-only">Require personal email invitations</Label>
+              <Switch id="invite-only" checked={v.invitationOnly} onCheckedChange={(x) => set("invitationOnly", x)} />
+              <p className="text-xs text-muted-foreground">Prevents access through the public link. Send invitations from the interview dashboard.</p>
+              <Label htmlFor="emails">Email allowlist (optional)</Label>
               <Textarea
                 id="emails"
                 rows={3}
@@ -441,9 +446,14 @@ export function InterviewEditor({
                 placeholder="Leave empty to let anyone with the link respond. Or paste emails, one per line."
                 onChange={(e) => setEmailsText(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Each email can complete the interview once.</p>
+              <p className="text-xs text-muted-foreground">An allowlist requires a personal invitation for each address; saving it does not send emails.</p>
             </div>
           )}
+          <div className="space-y-1.5">
+            <Label htmlFor="retention-days">Data retention (days)</Label>
+            <Input id="retention-days" type="number" min={1} max={3650} value={v.retentionDays} onChange={(e) => set("retentionDays", Number(e.target.value))} />
+            <p className="text-xs text-muted-foreground">Applies to new responses. Scheduled cleanup must be configured by your administrator. Existing records are not silently deleted.</p>
+          </div>
         </Section>
       </div>
 

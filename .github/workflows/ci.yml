@@ -7,14 +7,32 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: volo_test
+          POSTGRES_PASSWORD: volo_disposable_test_only
+          POSTGRES_DB: volo_deploy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U volo_test -d volo_deploy_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       AI_MOCK: "1"
-      BETTER_AUTH_SECRET: ci-only-secret
+      DATABASE_URL: ""
+      DATABASE_MODE: postgres
+      TEST_POSTGRES_URL: postgresql://volo_test:volo_disposable_test_only@127.0.0.1:5432/volo_deploy_test?sslmode=disable
+      BETTER_AUTH_SECRET: ci-only-signing-secret-never-use-in-production
+      BETTER_AUTH_URL: http://localhost:3100
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.13.0
           cache: npm
       - run: npm ci
       - run: npm run lint

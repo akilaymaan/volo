@@ -31,6 +31,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/interviews/[id]/
     headers: {
       "content-type": "text/csv; charset=utf-8",
       "content-disposition": `attachment; filename="${filename}"`,
+      "cache-control": "private, no-store",
     },
   });
 }

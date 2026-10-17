@@ -5,9 +5,11 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ---------- better-auth tables ----------
@@ -88,9 +90,13 @@ export const verification = pgTable(
 
 export type Question = { id: string; question: string; followUps: number };
 export type TranscriptTurn = { role: "agent" | "user"; text: string; at: number };
+export type InterviewSnapshot = Pick<Interview, "name" | "objective" | "questions" | "language" | "durationMins"> & {
+  persona?: Pick<Interviewer, "id" | "name" | "description" | "voice" | "color" | "empathy" | "exploration" | "rapport" | "speed">;
+};
 
 export type Analytics = {
-  overallScore: number;
+  rubricVersion?: string;
+  overallScore: number | null;
   recommendation: "strong_yes" | "yes" | "maybe" | "no";
   overallFeedback: string;
   callSummary: string;
@@ -103,6 +109,11 @@ export type Analytics = {
     question: string;
     status: "answered" | "not_answered" | "not_asked";
     summary: string;
+    questionId?: string;
+    score?: number | null;
+    evidence?: { turnIndex: number; quote: string }[];
+    strengths?: string[];
+    improvements?: string[];
   }[];
   quotes: { quote: string; analysis: string; type: "strength" | "improvement" }[];
 };
@@ -145,10 +156,12 @@ export const interview = pgTable(
     questions: jsonb("questions").$type<Question[]>().notNull().default([]),
     isActive: boolean("is_active").notNull().default(true),
     isAnonymous: boolean("is_anonymous").notNull().default(false),
+    retentionDays: integer("retention_days").notNull().default(90),
     themeColor: text("theme_color").notNull().default("#6d28d9"),
     logoUrl: text("logo_url"),
     // empty = anyone with the link may respond
     allowedEmails: jsonb("allowed_emails").$type<string[]>().notNull().default([]),
+    invitationOnly: boolean("invitation_only").notNull().default(false),
     insights: jsonb("insights").$type<string[]>().notNull().default([]),
     insightsUpdatedAt: timestamp("insights_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -165,6 +178,15 @@ export const response = pgTable(
       .references(() => interview.id, { onDelete: "cascade" }),
     name: text("name").notNull().default(""),
     email: text("email").notNull().default(""),
+    sessionHash: text("session_hash"),
+    sessionExpiresAt: timestamp("session_expires_at", { withTimezone: true }),
+    consentVersion: text("consent_version"),
+    consentedAt: timestamp("consented_at", { withTimezone: true }),
+    deleteAfter: timestamp("delete_after", { withTimezone: true }),
+    interviewSnapshot: jsonb("interview_snapshot").$type<InterviewSnapshot>(),
+    lastReplyEnd: boolean("last_reply_end").notNull().default(false),
+    turnLeaseUntil: timestamp("turn_lease_until", { withTimezone: true }),
+    invitationId: text("invitation_id").references(() => invitation.id, { onDelete: "set null" }),
     status: text("status").$type<"in_progress" | "completed">().notNull().default("in_progress"),
     candidateStatus: text("candidate_status")
       .$type<"none" | "shortlisted" | "maybe" | "rejected">()
@@ -186,7 +208,7 @@ export const response = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
   },
-  (t) => [index("response_interview_idx").on(t.interviewId)],
+  (t) => [index("response_interview_idx").on(t.interviewId), index("response_delete_after_idx").on(t.deleteAfter)],
 );
 
 export const recording = pgTable("recording", {
@@ -203,11 +225,53 @@ export const feedback = pgTable("feedback", {
   interviewId: text("interview_id")
     .notNull()
     .references(() => interview.id, { onDelete: "cascade" }),
-  responseId: text("response_id").unique(),
+  responseId: text("response_id").unique().references(() => response.id, { onDelete: "cascade" }),
   satisfaction: integer("satisfaction").notNull(),
   comment: text("comment").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Separate claims preserve historical duplicate rows without weakening new intake.
+export const candidateAttempt = pgTable("candidate_attempt", {
+  interviewId: text("interview_id").notNull().references(() => interview.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  responseId: text("response_id").notNull().references(() => response.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.interviewId, t.email] })]);
+
+export const rateLimit = pgTable("rate_limit", {
+  key: text("key").primaryKey(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull(),
+});
+
+export const invitation = pgTable("invitation", {
+  id: text("id").primaryKey(),
+  interviewId: text("interview_id").notNull().references(() => interview.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  tokenHash: text("token_hash"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  status: text("status").$type<"pending" | "sent" | "failed" | "started" | "completed" | "revoked">().notNull().default("pending"),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  sendCount: integer("send_count").notNull().default(0),
+  providerId: text("provider_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("invitation_interview_email_idx").on(t.interviewId, t.email), index("invitation_expires_at_idx").on(t.expiresAt)]);
+
+export const usageEvent = pgTable("usage_event", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  responseId: text("response_id").references(() => response.id, { onDelete: "set null" }),
+  operation: text("operation").notNull(),
+  model: text("model").notNull(),
+  units: jsonb("units").$type<{
+    inputTokens?: number; outputTokens?: number; cacheReadTokens?: number;
+    cacheWriteTokens?: number; characters?: number; audioBytes?: number;
+  }>().notNull(),
+  estimatedCostMicrousd: integer("estimated_cost_microusd"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("usage_account_created_idx").on(t.accountId, t.createdAt)]);
 
 export type Interview = typeof interview.$inferSelect;
 export type Interviewer = typeof interviewer.$inferSelect;

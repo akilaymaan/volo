@@ -3,15 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/migrate.mjs && next dev",
-    "build": "node scripts/migrate.mjs && next build",
-    "start": "node scripts/migrate.mjs && next start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db": "node scripts/migrate.mjs",
+    "db:migrate": "npm run db",
+    "db:local": "node scripts/migrate.mjs --local"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

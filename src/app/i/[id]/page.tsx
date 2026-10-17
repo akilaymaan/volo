@@ -46,6 +46,7 @@ export default async function InterviewLink(props: PageProps<"/i/[id]">) {
         description: iv.description,
         durationMins: iv.durationMins,
         isAnonymous: iv.isAnonymous,
+        retentionDays: iv.retentionDays,
         themeColor: iv.themeColor,
         logoUrl: iv.logoUrl,
         languageLabel: languageLabel(iv.language),

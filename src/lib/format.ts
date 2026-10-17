@@ -7,5 +7,5 @@ export function analysisState(r: {
 }): "running" | "done" | "failed" {
   if (r.analysisStatus === "done" || r.analysisStatus === "failed") return r.analysisStatus;
   const fresh = r.analysisStartedAt && Date.now() - r.analysisStartedAt.getTime() < 5 * 60_000;
-  return r.analysisStatus === "running" && fresh ? "running" : "failed";
+  return fresh ? "running" : "failed";
 }

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, lt, ne, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
@@ -10,7 +10,7 @@ import { generateQuestions } from "@/lib/ai/tasks";
 import { requireUser } from "@/lib/auth";
 import { AVATAR_COLORS, LANGUAGES, VOICES } from "@/lib/constants";
 import { db } from "@/lib/db";
-import { interview, interviewer, response } from "@/lib/db/schema";
+import { interview, interviewer, invitation, response } from "@/lib/db/schema";
 import {
   getOwnedInterview,
   getOwnedResponse,
@@ -18,14 +18,20 @@ import {
   refreshInsights,
   runAnalysis,
 } from "@/lib/data";
+import { revokeInvite, sendInvite } from "@/lib/invitations";
+import { withUsage } from "@/lib/usage";
+import { expireAccountData } from "@/lib/retention";
+import { PublicError } from "@/lib/errors";
+import { takeRateLimit } from "@/lib/rate-limit";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 const fail = (e: unknown): { ok: false; error: string } => {
   unstable_rethrow(e); // let redirect()/notFound() through
   if (e instanceof z.ZodError) return { ok: false, error: e.issues[0]?.message ?? "Invalid input" };
-  console.error(e);
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+  if (e instanceof PublicError) return { ok: false, error: e.message };
+  console.error("[action] failed", { type: e instanceof Error ? e.name : "unknown" });
+  return { ok: false, error: "Something went wrong. Please try again or contact support." };
 };
 
 // ---------- interviews ----------
@@ -56,19 +62,43 @@ const InterviewInput = z.object({
       }),
     )
     .min(1, "Add at least one question")
-    .max(25),
+    .max(25)
+    .refine((qs) => new Set(qs.map((q) => q.id)).size === qs.length, "Question IDs must be unique"),
   isAnonymous: z.boolean(),
   themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color"),
   logoUrl: logoSchema,
   allowedEmails: z.array(z.string().trim().toLowerCase().email("Invalid email in allowlist")).max(5000),
-});
+  invitationOnly: z.boolean().default(false),
+  retentionDays: z.number().int().min(1).max(3650).default(90),
+}).refine((v) => !v.isAnonymous || (!v.invitationOnly && !v.allowedEmails.length),
+  "Anonymous interviews cannot require email invitations or an allowlist.");
 export type InterviewInput = z.infer<typeof InterviewInput>;
+
+export async function sendInviteAction(interviewId: string, email: string): Promise<Result> {
+  try {
+    const user = await requireUser();
+    await sendInvite(user.id, interviewId, z.string().trim().toLowerCase().email().max(200).parse(email));
+    revalidatePath(`/dashboard/interviews/${interviewId}`);
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+export async function revokeInviteAction(interviewId: string, invitationId: string): Promise<Result> {
+  try {
+    const user = await requireUser();
+    await revokeInvite(user.id, interviewId, invitationId);
+    revalidatePath(`/dashboard/interviews/${interviewId}`);
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
 
 export async function generateQuestionsAction(
   form: FormData,
 ): Promise<Result<{ questions: string[]; description: string }>> {
   try {
-    await requireUser();
+    const user = await requireUser();
+    if (!(await takeRateLimit(`questions:${user.id}`, 30)))
+      throw new PublicError("Question generation limit reached. Please wait ten minutes.");
     const input = z
       .object({
         name: z.string().trim().min(1, "Add a name first").max(120),
@@ -86,14 +116,15 @@ export async function generateQuestionsAction(
     let pdf: { base64: string } | undefined;
     const file = form.get("file");
     if (file instanceof File && file.size > 0) {
-      if (file.size > 8 * 1024 * 1024) throw new Error("File is too large (max 8 MB)");
+      if (file.size > 8 * 1024 * 1024) throw new PublicError("File is too large (max 8 MB)");
       if (file.type === "application/pdf") {
         pdf = { base64: Buffer.from(await file.arrayBuffer()).toString("base64") };
       } else {
         context = `${(await file.text()).slice(0, 30_000)}\n${context}`;
       }
     }
-    return { ok: true, ...(await generateQuestions({ ...input, context, pdf })) };
+    return { ok: true, ...(await withUsage({ accountId: user.id, operation: "questions" },
+      () => generateQuestions({ ...input, context, pdf }))) };
   } catch (e) {
     return fail(e);
   }
@@ -110,7 +141,7 @@ export async function saveInterviewAction(
     const values = { ...data, logoUrl: data.logoUrl || null };
     if (id) {
       await getOwnedInterview(id, user.id);
-      await db.update(interview).set(values).where(eq(interview.id, id));
+      await db.update(interview).set({ ...values, insights: [], insightsUpdatedAt: null }).where(eq(interview.id, id));
       revalidatePath(`/dashboard/interviews/${id}`);
       return { ok: true, id };
     }
@@ -151,6 +182,8 @@ export async function refreshInsightsAction(id: string): Promise<Result> {
   try {
     const user = await requireUser();
     await getOwnedInterview(id, user.id);
+    if (!(await takeRateLimit(`insights:${user.id}`, 10)))
+      throw new PublicError("Insights limit reached. Please wait ten minutes.");
     await refreshInsights(id);
     revalidatePath(`/dashboard/interviews/${id}`);
     return { ok: true };
@@ -180,8 +213,12 @@ export async function setCandidateStatusAction(
 export async function deleteResponseAction(responseId: string): Promise<Result> {
   try {
     const user = await requireUser();
-    const { interview: iv } = await getOwnedResponse(responseId, user.id);
-    await db.delete(response).where(eq(response.id, responseId));
+    const { interview: iv, response: r } = await getOwnedResponse(responseId, user.id);
+    await db.transaction(async (tx) => {
+      await tx.delete(response).where(eq(response.id, responseId));
+      if (r.email) await tx.delete(invitation).where(and(eq(invitation.interviewId, iv.id), eq(invitation.email, r.email)));
+      await tx.update(interview).set({ insights: [], insightsUpdatedAt: null }).where(eq(interview.id, iv.id));
+    });
     revalidatePath(`/dashboard/interviews/${iv.id}`);
     return { ok: true };
   } catch (e) {
@@ -189,11 +226,30 @@ export async function deleteResponseAction(responseId: string): Promise<Result> 
   }
 }
 
+export async function expireAccountDataAction(): Promise<Result> {
+  try {
+    const user = await requireUser();
+    await expireAccountData(user.id, true);
+    revalidatePath("/dashboard", "layout");
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
 export async function reanalyzeAction(responseId: string): Promise<Result> {
   try {
     const user = await requireUser();
-    const { interview: iv } = await getOwnedResponse(responseId, user.id);
-    await db.update(response).set({ analysisStatus: "running", analysisStartedAt: new Date() }).where(eq(response.id, responseId));
+    const { interview: iv, response: r } = await getOwnedResponse(responseId, user.id);
+    if (r.status !== "completed") throw new PublicError("Finish the interview before analyzing it.");
+    if (r.analysisStatus === "running" && r.analysisStartedAt && Date.now() - r.analysisStartedAt.getTime() < 300_000)
+      throw new PublicError("Analysis is already running.");
+    if (!(await takeRateLimit(`analysis:${user.id}`, 30)))
+      throw new PublicError("Analysis limit reached. Please wait ten minutes.");
+    const queued = await db.update(response).set({ analysisStatus: "pending", analysisStartedAt: new Date() })
+      .where(and(eq(response.id, responseId), or(
+        ne(response.analysisStatus, "running"), isNull(response.analysisStartedAt),
+        lt(response.analysisStartedAt, new Date(Date.now() - 300_000)),
+      ))).returning({ id: response.id });
+    if (!queued.length) throw new PublicError("Analysis is already running.");
     after(() => runAnalysis(responseId));
     revalidatePath(`/dashboard/interviews/${iv.id}`, "layout");
     return { ok: true };
@@ -229,7 +285,7 @@ export async function saveInterviewerAction(
         .set(data)
         .where(and(eq(interviewer.id, id), eq(interviewer.ownerId, user.id)))
         .returning({ id: interviewer.id });
-      if (!res.length) throw new Error("Built-in interviewers can't be edited — duplicate it instead");
+      if (!res.length) throw new PublicError("Built-in interviewers can't be edited — duplicate it instead");
       revalidatePath("/dashboard/interviewers");
       return { ok: true, id };
     }
@@ -250,12 +306,12 @@ export async function deleteInterviewerAction(id: string): Promise<Result> {
       .from(interview)
       .where(eq(interview.interviewerId, id))
       .limit(1);
-    if (inUse.length) throw new Error("This interviewer is used by an interview. Reassign it first.");
+    if (inUse.length) throw new PublicError("This interviewer is used by an interview. Reassign it first.");
     const res = await db
       .delete(interviewer)
       .where(and(eq(interviewer.id, id), eq(interviewer.ownerId, user.id)))
       .returning({ id: interviewer.id });
-    if (!res.length) throw new Error("Built-in interviewers can't be deleted");
+    if (!res.length) throw new PublicError("Built-in interviewers can't be deleted");
     revalidatePath("/dashboard/interviewers");
     return { ok: true };
   } catch (e) {

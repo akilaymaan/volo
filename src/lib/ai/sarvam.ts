@@ -1,5 +1,6 @@
 import "server-only";
 import { isMock } from "./mock";
+import { recordUsage } from "@/lib/usage";
 
 const BASE = "https://api.sarvam.ai";
 
@@ -40,6 +41,7 @@ export async function transcribe(audio: Blob, language: string): Promise<string>
     body: form,
   });
   if (!res.ok) throw await sarvamError(res);
+  await recordUsage(model, { audioBytes: audio.size });
   const json = (await res.json()) as { transcript?: string };
   return (json.transcript ?? "").trim();
 }
@@ -64,6 +66,7 @@ export async function synthesize(
     }),
   });
   if (!res.ok) throw await sarvamError(res);
+  await recordUsage(process.env.SARVAM_TTS_MODEL || "bulbul:v3", { characters: text.slice(0, 2400).length });
   const json = (await res.json()) as { audios: string[] };
   return Buffer.concat(json.audios.map((a) => Buffer.from(a, "base64")));
 }

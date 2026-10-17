@@ -27,6 +27,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { VoiceOrb } from "@/components/voice-orb";
 import { VoiceEngine } from "@/lib/voice-engine";
 import { cn } from "@/lib/utils";
+import { CONSENT_VERSION, DISCLOSURE } from "@/lib/privacy";
 
 export type PublicInterview = {
   id: string;
@@ -34,6 +35,7 @@ export type PublicInterview = {
   description: string;
   durationMins: number;
   isAnonymous: boolean;
+  retentionDays: number;
   themeColor: string;
   logoUrl: string | null;
   languageLabel: string;
@@ -104,6 +106,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
   const startedAt = useRef(0);
   const tabRef = useRef(0);
   const transcriptLen = useRef(0);
+  const invitationToken = useRef<string | undefined>(undefined);
   const inflight = useRef<Promise<unknown> | null>(null);
   const meter = useRef<HTMLSpanElement>(null);
 
@@ -281,6 +284,8 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
     e.preventDefault();
     if (!micStream.current) return;
     setError("");
+    invitationToken.current ??= new URLSearchParams(window.location.hash.slice(1)).get("invite") || undefined;
+    if (window.location.hash) window.history.replaceState(null, "", window.location.pathname);
     // Create audio inside the click so browsers allow playback
     const eng = new VoiceEngine(micStream.current);
     engine.current = eng;
@@ -289,7 +294,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
       const res = await fetch("/api/call/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ interviewId: interview.id, name, email }),
+        body: JSON.stringify({ interviewId: interview.id, name, email, invitationToken: invitationToken.current, consentVersion: consent ? CONSENT_VERSION : "" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't start the interview");
@@ -410,6 +415,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
               {micError && <p className="mt-2 text-sm text-destructive">{micError}</p>}
             </div>
 
+            <p className="text-sm text-muted-foreground">{DISCLOSURE} Interview data is scheduled for deletion after {interview.retentionDays} days.</p>
             <label className="flex items-start gap-3 text-sm text-muted-foreground">
               <input
                 type="checkbox"

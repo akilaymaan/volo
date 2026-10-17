@@ -1,5 +1,7 @@
 node_modules
 .next
+.next-verify
+.git
 .data
 .env*
 !.env.example

@@ -46,7 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 const noop = () => () => {};
 
-export function InterviewActions({ id, isActive }: { id: string; isActive: boolean }) {
+export function InterviewActions({ id, isActive, invitationOnly }: { id: string; isActive: boolean; invitationOnly: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [shareOpen, setShareOpen] = useState(() => params.get("share") === "1");
@@ -119,7 +119,7 @@ export function InterviewActions({ id, isActive }: { id: string; isActive: boole
           <DialogHeader>
             <DialogTitle>Share with candidates</DialogTitle>
             <DialogDescription>
-              Anyone with this link can take the interview{active ? "" : " once you turn it back on"}.
+              {invitationOnly ? "Candidates need their personal email invitation. Send one from the Invitations tab." : `Anyone with this link can take the interview${active ? "" : " once you turn it back on"}.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
@@ -134,6 +134,7 @@ export function InterviewActions({ id, isActive }: { id: string; isActive: boole
               <Label htmlFor="embed">Embed on your careers page</Label>
               <Textarea id="embed" readOnly rows={3} value={embed} onFocus={(e) => e.target.select()} className="font-mono text-xs" />
               <CopyButton text={embed} label="Copy embed code" />
+              <p className="text-xs text-muted-foreground">Use a top-level personal link for invitations. Cross-site embeds may block the secure session cookie; open the interview in a new tab if that happens.</p>
             </div>
           </div>
         </DialogContent>

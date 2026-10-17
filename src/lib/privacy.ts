@@ -1,0 +1,2 @@
+export const CONSENT_VERSION = "2026-10-16-v1";
+export const DISCLOSURE = "You will speak with an AI interviewer. Your intake details and answers are stored for the hiring team. Your audio is recorded, transcribed by Sarvam, and analyzed by Anthropic. AI assessments are advisory; a person must review any hiring decision. Tab changes are logged as context, not proof of misconduct. Contact the hiring team to request access, correction, deletion, or an alternative interview.";

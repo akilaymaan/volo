@@ -1,10 +1,14 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { transcribe } from "@/lib/ai/sarvam";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 it("uploads recorder audio without the codecs parameter Sarvam rejects", async () => {
-  process.env.SARVAM_API_KEY = "test";
+  vi.stubEnv("AI_MOCK", "0");
+  vi.stubEnv("SARVAM_API_KEY", "test");
   let sent: File | undefined;
   vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
     sent = (init.body as FormData).get("file") as File;

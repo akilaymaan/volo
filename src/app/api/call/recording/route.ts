@@ -17,17 +17,20 @@ export async function POST(req: Request) {
   const mime = AUDIO_TYPES.find((t) => file.type.split(";")[0].trim().toLowerCase() === t);
   if (!mime) return json({ error: "Unsupported type" }, 415);
 
-  const call = await loadCall(String(form.get("responseId") ?? ""));
+  const call = await loadCall(String(form.get("responseId") ?? ""), req);
   if (!call) return json({ error: "Not found" }, 404);
-  // Only accept the upload shortly after the call (the id is the candidate's token)
+  if (call.response.status !== "completed") return json({ error: "Finish the interview before uploading a recording" }, 409);
+  // Only accept the upload shortly after the call, with its separate session credential.
   if (Date.now() - call.response.createdAt.getTime() > 3 * 60 * 60 * 1000)
     return json({ error: "Upload window closed" }, 410);
 
   const data = Buffer.from(await file.arrayBuffer());
-  await db
-    .insert(recording)
-    .values({ responseId: call.response.id, mime, data })
-    .onConflictDoUpdate({ target: recording.responseId, set: { mime, data } });
-  await db.update(response).set({ hasRecording: true }).where(eq(response.id, call.response.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(recording)
+      .values({ responseId: call.response.id, mime, data })
+      .onConflictDoNothing({ target: recording.responseId });
+    await tx.update(response).set({ hasRecording: true }).where(eq(response.id, call.response.id));
+  });
   return json({ ok: true });
 }

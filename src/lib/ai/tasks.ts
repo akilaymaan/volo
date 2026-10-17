@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Analytics, Interview, Interviewer, TranscriptTurn } from "@/lib/db/schema";
 import { INTERVIEWER_MODEL, structured } from "./claude";
 import { isMock } from "./mock";
+import { groundAssessment, RUBRIC } from "@/lib/evaluation";
 import {
   ANALYSIS_SYSTEM,
   INSIGHTS_SYSTEM,
@@ -117,6 +118,11 @@ const AnalyticsSchema = z.object({
       question: z.string(),
       status: enumText(Q_STATUS),
       summary: z.string(),
+      questionId: z.string(),
+      score: z.number().nullable(),
+      evidence: z.array(z.object({ turnIndex: z.number().int(), quote: z.string() })),
+      strengths: z.array(z.string()),
+      improvements: z.array(z.string()),
     }),
   ),
   quotes: z.array(
@@ -134,7 +140,8 @@ export async function analyzeTranscript(
   interviewerName: string,
 ): Promise<Analytics> {
   if (isMock()) {
-    return {
+    const candidateTurns = transcript.map((t, i) => ({ ...t, i })).filter((t) => t.role === "user" && t.text !== "[no response]");
+    return groundAssessment({
       overallScore: 78,
       recommendation: "yes",
       overallFeedback: "Clear, structured answers with relevant examples. Could go deeper on trade-offs.",
@@ -145,21 +152,26 @@ export async function analyzeTranscript(
       strengths: ["Concrete examples", "Clear communication"],
       improvements: ["Discuss trade-offs in more depth"],
       questionSummaries: interview.questions.map((q, i) => ({
+        questionId: q.id,
         question: q.question,
-        status: i < 3 ? "answered" : "not_asked",
-        summary: i < 3 ? "Gave a relevant, well-structured answer." : "",
+        status: candidateTurns[i] ? "answered" : "not_asked",
+        summary: candidateTurns[i] ? "Gave a relevant, well-structured answer." : "",
+        score: candidateTurns[i] ? 3 : null,
+        evidence: candidateTurns[i] ? [{ turnIndex: candidateTurns[i].i, quote: candidateTurns[i].text }] : [],
+        strengths: ["Specific job-relevant examples"],
+        improvements: ["Explain trade-offs"],
       })),
       quotes: [
         { quote: "This is a mock answer from the candidate.", analysis: "Direct and concise.", type: "strength" },
       ],
-    };
+    }, interview, transcript);
   }
   const out = await structured(AnalyticsSchema, {
-    system: ANALYSIS_SYSTEM,
+    system: `${ANALYSIS_SYSTEM}\nQuestion scoring rubric: ${RUBRIC}`,
     messages: [{ role: "user", content: analysisPrompt(interview, transcript, interviewerName) }],
     effort: "medium",
   });
-  return {
+  return groundAssessment({
     ...out,
     overallScore: clamp(out.overallScore, 0, 100),
     recommendation: oneOf(RECS, "maybe")(out.recommendation),
@@ -167,7 +179,7 @@ export async function analyzeTranscript(
     communication: { ...out.communication, score: clamp(out.communication.score, 0, 10) },
     questionSummaries: out.questionSummaries.map((q) => ({ ...q, status: oneOf(Q_STATUS, "answered")(q.status) })),
     quotes: out.quotes.map((q) => ({ ...q, type: oneOf(QUOTE_TYPES, "strength")(q.type) })),
-  };
+  }, interview, transcript);
 }
 
 // ---------- cohort insights ----------

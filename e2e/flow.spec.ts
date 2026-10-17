@@ -1,18 +1,28 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type BrowserContext, type Page, test } from "@playwright/test";
 import { TEST_USER } from "./fixtures";
+import { CONSENT_VERSION } from "../src/lib/privacy";
 
 // One recruiter journey end to end: sign up → create interview → candidate voice call → report.
 test.describe.configure({ mode: "serial" });
 
 let interviewUrl = "";
 let interviewId = "";
+let reportId = "";
+let recruiterCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | undefined;
 
 async function signIn(page: Page) {
+  if (recruiterCookies) {
+    await page.context().addCookies(recruiterCookies);
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/dashboard$/);
+    return;
+  }
   await page.goto("/sign-in");
   await page.getByLabel("Work email").fill(TEST_USER.email);
   await page.getByLabel("Password").fill(TEST_USER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  recruiterCookies = await page.context().cookies();
 }
 
 test("dashboard requires an account", async ({ page }) => {
@@ -64,9 +74,10 @@ test("candidate completes a voice interview", async ({ page }) => {
   const deadline = Date.now() + 60_000;
   // Answer whenever the interviewer is listening, until it wraps up
   while (!(await thanks.isVisible()) && Date.now() < deadline) {
-    if (await done.isEnabled().catch(() => false)) {
+    // The closing turn can remove the button between these checks.
+    if (await done.isEnabled({ timeout: 500 }).catch(() => false)) {
       await page.waitForTimeout(700); // let the fake mic record something
-      await done.click().catch(() => {});
+      await done.click({ timeout: 1000 }).catch(() => {});
     }
     await page.waitForTimeout(300);
   }
@@ -78,14 +89,14 @@ test("candidate completes a voice interview", async ({ page }) => {
 
 test("the same email can't take it twice", async ({ request }) => {
   const res = await request.post("/api/call/start", {
-    data: { interviewId, name: "Asha Tester", email: "ASHA@example.test" },
+    data: { interviewId, name: "Asha Tester", email: "ASHA@example.test", consentVersion: CONSENT_VERSION },
   });
   expect(res.status()).toBe(409);
 });
 
 test("public call API is idempotent and strict", async ({ request }) => {
   const start = await request.post("/api/call/start", {
-    data: { interviewId, name: "Ravi Retry", email: "ravi@example.test" },
+    data: { interviewId, name: "Ravi Retry", email: "ravi@example.test", consentVersion: CONSENT_VERSION },
   });
   const { responseId } = await start.json();
 
@@ -120,10 +131,14 @@ test("recruiter reviews the scored report", async ({ page }) => {
   await expect(page.getByText("5 / 5")).toBeVisible();
 
   await row.click();
+  await expect(page).toHaveURL(/\/responses\/[\w-]+$/);
+  reportId = page.url().split("/responses/")[1];
   await expect(page.getByRole("heading", { name: "Asha Tester" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Overall: 78 out of 100" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Overall: 75 out of 100" })).toBeVisible();
   await expect(page.getByText("This is a mock answer from the candidate.").first()).toBeVisible();
   await expect(page.locator("audio")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("AI assessment — human review required.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Rubric score: 3 / 4").first()).toBeVisible();
 
   await page.getByRole("combobox", { name: "Candidate status" }).click();
   await page.getByRole("option", { name: "Shortlisted" }).click();
@@ -139,6 +154,57 @@ test("recruiter reviews the scored report", async ({ page }) => {
   await page.getByRole("tab", { name: "Insights" }).click();
   await page.getByRole("button", { name: "Generate insights" }).click();
   await expect(page.getByText("Communication scores are consistently strong across the pool.")).toBeVisible();
+  await page.getByRole("tab", { name: "Invitations", exact: true }).click();
+  await page.getByLabel("Candidate email").fill("invited@example.test");
+  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
+  await expect(page.getByText("invited@example.test", { exact: true })).toBeVisible();
+});
+
+test("candidate credentials do not leak through report identifiers", async ({ request }) => {
+  expect((await request.post("/api/call/end", { data: { responseId: reportId } })).status()).toBe(404);
+  expect((await request.post("/api/call/feedback", { data: { responseId: reportId, satisfaction: 1 } })).status()).toBe(404);
+  expect((await request.get(`/api/recordings/${reportId}`)).status()).toBe(401);
+  expect((await request.post("/api/call/start", { data: { interviewId, name: "No Consent", email: "noconsent@example.test" } })).status()).toBe(400);
+});
+
+test("usage and privacy is account scoped and maintenance is guarded", async ({ page, request }) => {
+  await signIn(page);
+  await page.getByRole("link", { name: "Usage and privacy" }).click();
+  await expect(page.getByRole("heading", { name: "Usage and privacy" })).toBeVisible();
+  await expect(page.getByText("No recorded provider usage yet.")).toBeVisible();
+  expect((await request.post("/api/maintenance/retention", { data: { dryRun: true } })).status()).toBe(401);
+  expect((await request.post("/api/maintenance/retention", {
+    headers: { authorization: "Bearer e2e-maintenance-secret-not-for-production" }, data: { dryRun: false },
+  })).status()).toBe(403);
+});
+
+test("recruiter compares evidence-backed reports for the same role", async ({ page, request }) => {
+  const begun = await request.post("/api/call/start", {
+    data: { interviewId, name: "Sam Compare", email: "sam@example.test", consentVersion: CONSENT_VERSION },
+  });
+  expect(begun.status()).toBe(200);
+  const { responseId } = await begun.json();
+  const first = await request.post("/api/call/turn", { multipart: { responseId, len: "0" } });
+  let len = (await first.json()).len;
+  for (let answer = 0; answer < 3; answer++) {
+    const reply = await request.post("/api/call/turn", { multipart: {
+      responseId, len: String(len),
+      chunk: { name: "answer.webm", mimeType: "audio/webm", buffer: Buffer.from("mock audio") },
+    } });
+    expect(reply.status()).toBe(200);
+    len = (await reply.json()).len;
+  }
+  expect((await request.post("/api/call/end", { data: { responseId } })).status()).toBe(200);
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByLabel("Asha Tester", { exact: true }).check();
+  await expect(page.getByLabel("Sam Compare", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel("Sam Compare", { exact: true }).check();
+  await page.getByRole("button", { name: "Compare selected" }).click();
+  await expect(page.getByRole("heading", { name: "Compare candidates", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Asha Tester" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Sam Compare" })).toBeVisible();
+  await expect(page.getByText("3 / 5 assessed").first()).toBeVisible();
 });
 
 test("recruiter creates a custom interviewer", async ({ page }) => {
@@ -163,5 +229,8 @@ test("other accounts can't see this interview", async ({ browser }) => {
   const res = await page.goto(`/dashboard/interviews/${interviewId}`);
   expect(res?.status()).toBe(404);
   expect((await page.request.get(`/api/interviews/${interviewId}/export`)).status()).toBe(404);
+  expect((await page.request.get(`/api/recordings/${reportId}`)).status()).toBe(404);
+  expect((await page.goto(`/dashboard/interviews/${interviewId}/responses/${reportId}`))?.status()).toBe(404);
+  expect((await page.goto(`/dashboard/interviews/${interviewId}/compare?candidate=${reportId}&candidate=other`))?.status()).toBe(404);
   await ctx.close();
 });
