@@ -43,6 +43,18 @@ describe.skipIf(!raw)("disposable PostgreSQL deployment", () => {
     expect(await client`select * from drizzle.__drizzle_migrations`).toHaveLength(6);
   }, 30_000);
 
+  it("runs the rate-limit upsert through the app db layer against real PostgreSQL", async () => {
+    // postgres.js prepare:false cannot serialize raw Date params in sql`` fragments;
+    // PGlite tolerated them, so this only fails against real PostgreSQL.
+    process.env.DATABASE_URL = raw;
+    delete process.env.DATABASE_MODE;
+    const { takeRateLimit } = await import("@/lib/rate-limit");
+    const key = `deploy-${randomUUID()}`;
+    expect(await takeRateLimit(key, 2)).toBe(true);
+    expect(await takeRateLimit(key, 2)).toBe(true);
+    expect(await takeRateLimit(key, 2)).toBe(false);
+  });
+
   it("rejects a second migration process while the direct connection lock is held", async () => {
     await client`select pg_advisory_lock(${MIGRATION_LOCK[0]}, ${MIGRATION_LOCK[1]})`;
     try {

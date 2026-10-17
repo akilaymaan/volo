@@ -12,7 +12,7 @@ export async function expireAccountData(accountId: string, apply = false) {
   const oldInvites = await db.select({ id: invitation.id }).from(invitation)
     .innerJoin(interview, eq(invitation.interviewId, interview.id))
     .where(and(eq(interview.ownerId, accountId),
-      lt(invitation.expiresAt, sql`${now}::timestamptz - (${interview.retentionDays} * interval '1 day')`)));
+      lt(invitation.expiresAt, sql`${now.toISOString()}::timestamptz - (${interview.retentionDays} * interval '1 day')`)));
   if (!apply) return { responses: due.length, invitations: oldInvites.length, applied: false };
   await db.transaction(async (tx) => {
     if (due.length) {

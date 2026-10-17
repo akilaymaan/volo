@@ -12,7 +12,7 @@ export async function takeRateLimit(key: string, limit: number, windowMs = 600_0
       target: rateLimit.key,
       set: {
         windowStart: start,
-        count: sql`case when ${rateLimit.windowStart} = ${start} then ${rateLimit.count} + 1 else 1 end`,
+        count: sql`case when ${rateLimit.windowStart} = ${start.toISOString()} then ${rateLimit.count} + 1 else 1 end`,
       },
     }).returning({ count: rateLimit.count });
   return row.count <= limit;
