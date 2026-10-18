@@ -25,6 +25,7 @@ import { PublicError } from "@/lib/errors";
 import { takeRateLimit } from "@/lib/rate-limit";
 import { deleteTemplate, saveTemplate } from "@/lib/templates";
 import { previewInvitationImport } from "@/lib/bulk-invitations";
+import { bulkReviewCandidates } from "@/lib/bulk-review";
 import { MAX_IMPORT_BYTES, type ImportMode, type ImportRecipient } from "@/lib/invitation-import";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -239,6 +240,15 @@ export async function refreshInsightsAction(id: string): Promise<Result> {
 }
 
 // ---------- responses ----------
+
+export async function bulkReviewCandidatesAction(input: unknown): Promise<Result<{ count: number }>> {
+  try {
+    const user = await requireUser();
+    const result = await bulkReviewCandidates(user.id, input);
+    revalidatePath(`/dashboard/interviews/${result.interviewId}`, "layout");
+    return { ok: true, count: result.count };
+  } catch (e) { return fail(e); }
+}
 
 export async function setCandidateStatusAction(
   responseId: string,

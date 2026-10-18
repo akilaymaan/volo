@@ -51,6 +51,8 @@ export const TRAITS = [
   { key: "speed", label: "Pace", low: "Relaxed", high: "Brisk" },
 ] as const;
 
+export const MAX_BULK_REVIEW = 100;
+
 export const CANDIDATE_STATUSES = {
   none: { label: "Not reviewed", className: "bg-muted text-muted-foreground" },
   shortlisted: {

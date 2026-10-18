@@ -345,3 +345,33 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 - No live AI requests or email sends were used for verification. Disposable local
   databases were used; Neon data was not changed. Docker execution and live-provider
   staging checks were not performed. No commit, push or deployment was performed.
+
+## Bulk Candidate Review (2026-10-18)
+
+- The Candidates tab supports individual checkboxes and Select shown (first 100
+  when more results are visible), a selected count and Clear selection. Search or
+  status-filter changes clear selection; sorting preserves it. Hidden results are
+  never included in a batch. The mobile row layout preserves readable identities.
+- Choose Shortlisted, Maybe, Rejected or Not reviewed, then Review selection.
+  A confirmation lists candidate names/emails and the destination status. Cancelling
+  changes nothing. Pending updates disable selection and submission controls.
+- The server authenticates every action and validates unique, bounded selections
+  of 1–100 completed responses belonging to one owned interview. A transaction locks
+  the interview and responses, compares statuses captured at selection, and changes
+  only review statuses. A missing, foreign, unfinished or stale response rejects the
+  entire batch. Conflicting batches cannot both overwrite the same expected statuses.
+- Scores, transcripts, recordings, viewed flags and invitation records are unchanged.
+  AI is not consulted, and no emails are sent. Existing single-report review and
+  candidate comparison remain available. These are manual advisory review decisions.
+- Successful actions refresh the interview and report pages. Failed or unconfirmed
+  requests clear selection; network ambiguity prompts a refresh/check before retrying.
+  No automatic retry or background batch is used. Expected statuses are not a full
+  history/audit log: changes that return to the same status cannot be distinguished.
+- PASS: 93 unit/integration tests; four real-PostgreSQL tests skipped locally.
+- PASS: all 22 isolated-build Chromium tests, including cancellation, filter-safe
+  selection, persistence, a second-tab conflict and a saved-but-lost update reply.
+- PASS: production build/TypeScript, lint, whitespace check and desktop/mobile
+  visual review, including the confirmation dialog and 390px overflow checks.
+- No schema migration or new dependency. Verification used disposable local
+  databases and isolated test-only provider doubles. No live Neon data changed,
+  real AI requests, email sends, commit, push or deployment were performed.

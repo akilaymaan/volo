@@ -363,6 +363,94 @@ test("recruiter compares evidence-backed reports for the same role", async ({ pa
   await expect(page.getByText("3 / 5 assessed").first()).toBeVisible();
 });
 
+test("recruiter confirms bulk review and selection never includes hidden results", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  const bulk = page.getByRole("region", { name: "Bulk candidate review" });
+  const asha = page.getByRole("checkbox", { name: "Select for review: Asha Tester", exact: true });
+  const sam = page.getByRole("checkbox", { name: "Select for review: Sam Compare", exact: true });
+  await asha.check();
+  await sam.check();
+  await expect(bulk.getByRole("status")).toHaveText("2 selected");
+  await bulk.getByRole("button", { name: "Review selection" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("list", { name: "Candidates to update" })).toContainText("Asha Tester");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  // Cancelling does not update Asha's existing status or discard the selection.
+  await expect(page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Asha Tester", exact: true }) })).toContainText("Shortlisted");
+  await page.getByRole("textbox", { name: "Search candidates" }).fill("Sam Compare");
+  await expect(bulk.getByRole("status")).toHaveText("0 selected");
+  await bulk.getByRole("button", { name: "Select shown", exact: true }).click();
+  await expect(bulk.getByRole("status")).toHaveText("1 selected");
+  await page.getByRole("combobox", { name: "Filter by status" }).click();
+  await page.getByRole("option", { name: "Maybe", exact: true }).click();
+  await expect(bulk.getByRole("status")).toHaveText("0 selected");
+  await expect(bulk.getByRole("button", { name: "Review selection" })).toBeDisabled();
+  await page.getByRole("combobox", { name: "Filter by status" }).click();
+  await page.getByRole("option", { name: "All candidates", exact: true }).click();
+  await page.getByRole("textbox", { name: "Search candidates" }).fill("");
+  await asha.check();
+  await sam.check();
+  await bulk.getByRole("combobox", { name: "Bulk candidate status" }).click();
+  await page.getByRole("option", { name: "Maybe", exact: true }).click();
+  await page.screenshot({ path: "test-results/bulk-review-desktop.png", fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/bulk-review-mobile.png", fullPage: true, animations: "disabled" });
+  await bulk.getByRole("button", { name: "Review selection" }).click();
+  await expect(dialog).toContainText("Set the selected candidates to Maybe");
+  await page.screenshot({ path: "test-results/bulk-review-confirmation-mobile.png", fullPage: true, animations: "disabled" });
+  await dialog.getByRole("button", { name: "Confirm status update" }).click();
+  await expect(page.getByText("2 candidate statuses updated", { exact: true })).toBeVisible();
+  await expect(bulk.getByRole("status")).toHaveText("0 selected");
+  await page.reload();
+  for (const name of ["Asha Tester", "Sam Compare"]) {
+    await expect(page.getByRole("listitem").filter({ has: page.getByRole("link", { name: new RegExp(`${name}$`) }) })).toContainText("Maybe");
+  }
+});
+
+test("a stale bulk selection cannot overwrite a newer report decision", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("checkbox", { name: "Select for review: Asha Tester", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Select for review: Sam Compare", exact: true }).check();
+  const otherTab = await page.context().newPage();
+  await otherTab.goto(`/dashboard/interviews/${interviewId}/responses/${reportId}`);
+  await otherTab.getByRole("combobox", { name: "Candidate status", exact: true }).click();
+  await otherTab.getByRole("option", { name: "Rejected", exact: true }).click();
+  await expect(otherTab.getByText("Marked as rejected", { exact: true })).toBeVisible();
+  await otherTab.close();
+  const bulk = page.getByRole("region", { name: "Bulk candidate review" });
+  await bulk.getByRole("button", { name: "Review selection" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Confirm status update" }).click();
+  await expect(page.getByText("Candidate statuses changed since selection. Refresh and select them again. No statuses were changed.", { exact: true })).toBeVisible();
+  await expect(bulk.getByRole("status")).toHaveText("0 selected");
+  await expect(page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Asha Tester", exact: true }) })).toContainText("Rejected");
+  await expect(page.getByRole("listitem").filter({ has: page.getByRole("link", { name: /Sam Compare$/ }) })).toContainText("Maybe");
+});
+
+test("an unconfirmed bulk update is not automatically retried", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("checkbox", { name: "Select for review: Sam Compare", exact: true }).check();
+  let requests = 0;
+  await page.route(`**/dashboard/interviews/${interviewId}`, async (route) => {
+    if (route.request().method() === "POST" && route.request().headers()["next-action"]) {
+      requests++;
+      await route.fetch();
+      await route.fulfill({ status: 503, body: "Lost update reply" });
+    } else await route.continue();
+  });
+  const bulk = page.getByRole("region", { name: "Bulk candidate review" });
+  await bulk.getByRole("button", { name: "Review selection" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Confirm status update" }).click();
+  await expect(page.getByText("Could not confirm the update. Refresh and check candidate statuses before trying again.", { exact: true })).toBeVisible();
+  await expect(bulk.getByRole("status")).toHaveText("0 selected");
+  expect(requests).toBe(1);
+  await page.reload();
+  await expect(page.getByRole("listitem").filter({ has: page.getByRole("link", { name: /Sam Compare$/ }) })).toContainText("Shortlisted");
+});
+
 test("recruiter creates a custom interviewer", async ({ page }) => {
   await signIn(page);
   await page.goto("/dashboard/interviewers");
