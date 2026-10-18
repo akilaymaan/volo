@@ -27,3 +27,13 @@ it("does not leak provider response bodies on failures", async () => {
   await expect(sendInvitationMail({ email: "x", interviewName: "Role", url: "x", expiresAt: new Date(), deliveryKey: "x" }))
     .rejects.toThrow("Email provider rejected the request.");
 });
+
+it("clearly labels reminder emails and explains that the new link replaces the old one", async () => {
+  vi.stubEnv("RESEND_API_KEY", "test-key"); vi.stubEnv("EMAIL_FROM", "test"); vi.stubEnv("EMAIL_MOCK", "0");
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ id: "reminder-1" }));
+  vi.stubGlobal("fetch", fetcher);
+  await sendInvitationMail({ email: "candidate@example.test", interviewName: "Engineer", url: "https://example.test/new", expiresAt: new Date(), deliveryKey: "invite/1/2", reminder: true });
+  const body = JSON.parse(fetcher.mock.calls[0][1].body);
+  expect(body.subject).toBe("Interview reminder: Engineer");
+  expect(body.text).toContain("replaces your previous personal link");
+});

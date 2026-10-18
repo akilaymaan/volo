@@ -44,6 +44,21 @@ Open <http://localhost:3000> and create an account. The example configuration ex
   Links expire after seven days. Resends rotate the token and require a one-minute
   wait; account sends are capped at 100 attempts/hour. "Sent" means the provider
   accepted the message, not that it was delivered or opened.
+- The **Invitations** tab also supports **Bulk invitations and reminders**. Upload
+  a CSV under 100 KB with up to 100 recipients, an `email` header and optional
+  `name` header. Quoted CSV fields and UTF-8 BOMs are supported. Names are shown
+  for review, not saved as candidate identities. Preview flags invalid/duplicate
+  emails, existing invitations, started candidates and allowlist restrictions.
+  Confirm the eligible recipients to send; results appear per recipient. Keep the
+  tab open. **Stop after current send** leaves remaining recipients unsent.
+  A network failure stops the batch without automatic retries; refresh the
+  preview and check invitation status before retrying an unconfirmed send.
+- Choose **Reminders** to manually remind recipients from a CSV. Only previously
+  accepted, unexpired, non-revoked invitations for candidates who have not
+  started qualify. Wait 24 hours after the last attempt; reminders stop at three
+  total send attempts (including the initial invitation and failures). A reminder
+  rotates the personal link, replacing the old one. Automatic scheduled
+  reminders are not enabled. The existing per-account sending limit still applies.
 - Enable **Require personal email invitations** to restrict an interview.
   An email allowlist also requires personal links; saving a list does not send mail.
   Public interviews still work, but typed names/emails do not verify identity.

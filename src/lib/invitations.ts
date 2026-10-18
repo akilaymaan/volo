@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { candidateAttempt, invitation } from "@/lib/db/schema";
@@ -8,6 +8,7 @@ import { sendInvitationMail } from "@/lib/mail";
 import { takeRateLimit } from "@/lib/rate-limit";
 import { newToken, tokenHash } from "@/lib/security";
 import { PublicError } from "@/lib/errors";
+import { MAX_REMINDER_SEND_ATTEMPTS, REMINDER_WAIT_MS, reminderBlockReason } from "@/lib/invitation-import";
 
 export function publicOrigin() {
   const url = new URL(process.env.BETTER_AUTH_URL || "http://localhost:3000");
@@ -17,21 +18,31 @@ export function publicOrigin() {
   return url.origin;
 }
 
-export async function sendInvite(ownerId: string, interviewId: string, email: string) {
+export async function sendInvite(ownerId: string, interviewId: string, email: string, mode: "resend" | "new" | "reminder" = "resend") {
   const iv = await getOwnedInterview(interviewId, ownerId);
   if (!iv.isActive) throw new PublicError("Enable the interview before sending invitations.");
   if (iv.isAnonymous) throw new PublicError("Email invitations require named candidate intake.");
   if (iv.allowedEmails.length && !iv.allowedEmails.includes(email))
     throw new PublicError("Add this email to the interview allowlist first, or clear the allowlist.");
-  if (!(await takeRateLimit(`email:${ownerId}`, 100, 3_600_000)))
-    throw new PublicError("Account email limit reached. Try again in an hour.");
   const origin = publicOrigin();
   const [attempt] = await db.select().from(candidateAttempt)
     .where(and(eq(candidateAttempt.interviewId, interviewId), eq(candidateAttempt.email, email)));
   if (attempt) throw new PublicError("This candidate has already started or completed the interview.");
-  await db.insert(invitation).values({
-    id: nanoid(24), interviewId, email, expiresAt: new Date(Date.now() + 7 * 86_400_000),
-  }).onConflictDoNothing();
+  if (mode === "reminder") {
+    const [existing] = await db.select().from(invitation)
+      .where(and(eq(invitation.interviewId, interviewId), eq(invitation.email, email)));
+    const reason = reminderBlockReason(existing, false);
+    if (reason) throw new PublicError(reason);
+  }
+  if (!(await takeRateLimit(`email:${ownerId}`, 100, 3_600_000)))
+    throw new PublicError("Account email limit reached. Try again in an hour.");
+  if (mode !== "reminder") {
+    const inserted = await db.insert(invitation).values({
+      id: nanoid(24), interviewId, email, expiresAt: new Date(Date.now() + 7 * 86_400_000),
+    }).onConflictDoNothing().returning({ id: invitation.id });
+    // Bulk new sends never rotate an existing token, including after a lost response.
+    if (mode === "new" && !inserted.length) throw new PublicError("Invitation already exists. Refresh the preview before retrying.");
+  }
   const token = newToken();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 7 * 86_400_000);
@@ -40,14 +51,21 @@ export async function sendInvite(ownerId: string, interviewId: string, email: st
     tokenHash: tokenHash(token), expiresAt, revokedAt: null, status: "pending",
     lastAttemptAt: now, sendCount: sql`${invitation.sendCount} + 1`, providerId: null,
   }).where(and(eq(invitation.interviewId, interviewId), eq(invitation.email, email),
-    inArray(invitation.status, ["pending", "sent", "failed", "revoked"]),
-    or(isNull(invitation.lastAttemptAt), lt(invitation.lastAttemptAt, new Date(now.getTime() - 60_000))),
+    mode === "reminder" ? and(
+      eq(invitation.status, "sent"), isNull(invitation.revokedAt), gt(invitation.expiresAt, now),
+      lt(invitation.sendCount, MAX_REMINDER_SEND_ATTEMPTS),
+      lt(invitation.lastAttemptAt, new Date(now.getTime() - REMINDER_WAIT_MS)),
+    ) : and(
+      inArray(invitation.status, ["pending", "sent", "failed", "revoked"]),
+      or(isNull(invitation.lastAttemptAt), lt(invitation.lastAttemptAt, new Date(now.getTime() - 60_000))),
+    ),
   )).returning();
-  if (!sent) throw new PublicError("Wait one minute before resending, or check whether this candidate has already started.");
+  if (!sent) throw new PublicError(mode === "reminder" ? "Reminder eligibility changed. Refresh the preview." : "Wait one minute before resending, or check whether this candidate has already started.");
   try {
     const result = await sendInvitationMail({
       email, interviewName: iv.name, url: `${origin}/i/${interviewId}#invite=${token}`, expiresAt,
       deliveryKey: `invite/${sent.id}/${sent.sendCount}`,
+      reminder: mode === "reminder",
     });
     await db.update(invitation).set({ status: "sent", sentAt: now, providerId: result.id })
       .where(and(eq(invitation.id, sent.id), eq(invitation.tokenHash, tokenHash(token)), eq(invitation.status, "pending")));

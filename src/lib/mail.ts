@@ -1,6 +1,6 @@
 import "server-only";
 
-export type InvitationMail = { email: string; interviewName: string; url: string; expiresAt: Date; deliveryKey: string };
+export type InvitationMail = { email: string; interviewName: string; url: string; expiresAt: Date; deliveryKey: string; reminder?: boolean };
 
 export async function sendInvitationMail(mail: InvitationMail) {
   // The test/demo transport must be explicitly opted into along with fake AI.
@@ -15,8 +15,8 @@ export async function sendInvitationMail(mail: InvitationMail) {
     },
     body: JSON.stringify({
       from: process.env.EMAIL_FROM, to: [mail.email],
-      subject: `Interview invitation: ${mail.interviewName}`,
-      text: `You are invited to ${mail.interviewName}.\n\nOpen your personal link: ${mail.url}\n\nThis link expires ${mail.expiresAt.toISOString()}. Do not forward it. You will speak with an AI interviewer; your consent is requested before recording. A person reviews hiring decisions. Contact the hiring team for an alternative interview or help.`,
+      subject: `${mail.reminder ? "Interview reminder" : "Interview invitation"}: ${mail.interviewName}`,
+      text: `${mail.reminder ? "A reminder to complete" : "You are invited to"} ${mail.interviewName}.\n\n${mail.reminder ? "This replaces your previous personal link.\n\n" : ""}Open your personal link: ${mail.url}\n\nThis link expires ${mail.expiresAt.toISOString()}. Do not forward it. You will speak with an AI interviewer; your consent is requested before recording. A person reviews hiring decisions. Contact the hiring team for an alternative interview or help.`,
     }),
     signal: AbortSignal.timeout(15_000),
   });

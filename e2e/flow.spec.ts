@@ -162,6 +162,83 @@ test("recruiter reviews the scored report", async ({ page }) => {
   await expect(page.getByText("invited@example.test", { exact: true })).toBeVisible();
 });
 
+test("recruiter previews CSV recipients, sends eligible invitations and cannot import them twice", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("tab", { name: "Invitations", exact: true }).click();
+  const bulk = page.getByRole("region", { name: "Bulk invitations and reminders" });
+  await bulk.getByLabel("Recipient CSV").setInputFiles({
+    name: "recipients.csv", mimeType: "text/csv",
+    buffer: Buffer.from("name,email\nAsha,asha@example.test\nInvited,invited@example.test\nNew One,bulk-one@example.test\nNew Two,bulk-two@example.test\nDuplicate,BULK-ONE@example.test\nInvalid,not-an-email\n"),
+  });
+  await bulk.getByRole("button", { name: "Preview CSV" }).click();
+  await expect(bulk.getByText("2 ready to send · 4 skipped")).toBeVisible();
+  await expect(bulk.getByText("Candidate has already started or completed.")).toBeVisible();
+  const send = bulk.getByRole("button", { name: "Send 2 invitations", exact: true });
+  await expect(send).toBeDisabled();
+  await page.screenshot({ path: "test-results/bulk-invitations-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/bulk-invitations-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await bulk.getByRole("checkbox").check();
+  await send.click();
+  await expect(bulk.getByRole("status")).toHaveText("2 accepted by email provider, 0 failed or unconfirmed, 0 not attempted.");
+  await expect(page.getByRole("list", { name: "Invitations", exact: true }).getByText("bulk-one@example.test", { exact: true })).toBeVisible();
+  await bulk.getByRole("button", { name: "Preview CSV" }).click();
+  await expect(bulk.getByText("0 ready to send · 6 skipped")).toBeVisible();
+  await expect(bulk.getByRole("checkbox")).toHaveCount(0);
+  await bulk.getByLabel("Send type").selectOption("reminder");
+  await bulk.getByRole("button", { name: "Preview CSV" }).click();
+  await expect(bulk.getByText("0 ready to send · 6 skipped")).toBeVisible();
+  await expect(bulk.getByText("Wait 24 hours after the last send attempt.").first()).toBeVisible();
+});
+
+test("a recruiter can stop a bulk send after its in-flight recipient", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("tab", { name: "Invitations", exact: true }).click();
+  const bulk = page.getByRole("region", { name: "Bulk invitations and reminders" });
+  await bulk.getByLabel("Recipient CSV").setInputFiles({ name: "stop.csv", mimeType: "text/csv", buffer: Buffer.from("email\nstop-one@example.test\nstop-two@example.test\nstop-three@example.test") });
+  await bulk.getByRole("button", { name: "Preview CSV" }).click();
+  await expect(bulk.getByText("3 ready to send · 0 skipped")).toBeVisible();
+  await bulk.getByRole("checkbox").check();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let sends = 0;
+  await page.route(`**/dashboard/interviews/${interviewId}`, async (route) => {
+    if (route.request().method() === "POST" && route.request().headers()["next-action"]) { sends++; if (sends === 1) await gate; }
+    await route.continue();
+  });
+  try {
+    await bulk.getByRole("button", { name: "Send 3 invitations" }).click();
+    await bulk.getByRole("button", { name: "Stop after current send" }).click();
+  } finally { release(); }
+  await expect(bulk.getByRole("status")).toHaveText("1 accepted by email provider, 0 failed or unconfirmed, 2 not attempted.");
+  expect(sends).toBe(1);
+  await expect(page.getByRole("list", { name: "Invitations", exact: true }).getByText("stop-two@example.test", { exact: true })).toHaveCount(0);
+});
+
+test("ambiguous bulk-send transport failures stop the batch without automatic retries", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("tab", { name: "Invitations", exact: true }).click();
+  const bulk = page.getByRole("region", { name: "Bulk invitations and reminders" });
+  await bulk.getByLabel("Recipient CSV").setInputFiles({ name: "network.csv", mimeType: "text/csv", buffer: Buffer.from("email\nnetwork-one@example.test\nnetwork-two@example.test") });
+  await bulk.getByRole("button", { name: "Preview CSV" }).click();
+  await expect(bulk.getByText("2 ready to send · 0 skipped")).toBeVisible();
+  await bulk.getByRole("checkbox").check();
+  let sends = 0;
+  await page.route(`**/dashboard/interviews/${interviewId}`, async (route) => {
+    if (route.request().method() === "POST" && route.request().headers()["next-action"]) { sends++; await route.abort("failed"); }
+    else await route.continue();
+  });
+  await bulk.getByRole("button", { name: "Send 2 invitations" }).click();
+  await expect(bulk.getByRole("status")).toHaveText("0 accepted by email provider, 1 failed or unconfirmed, 1 not attempted.");
+  await expect(bulk.getByText("Send not confirmed.", { exact: false })).toBeVisible();
+  expect(sends).toBe(1);
+});
+
 test("candidate credentials do not leak through report identifiers", async ({ request }) => {
   expect((await request.post("/api/call/end", { data: { responseId: reportId } })).status()).toBe(404);
   expect((await request.post("/api/call/feedback", { data: { responseId: reportId, satisfaction: 1 } })).status()).toBe(404);

@@ -24,6 +24,8 @@ import { expireAccountData } from "@/lib/retention";
 import { PublicError } from "@/lib/errors";
 import { takeRateLimit } from "@/lib/rate-limit";
 import { deleteTemplate, saveTemplate } from "@/lib/templates";
+import { previewInvitationImport } from "@/lib/bulk-invitations";
+import { MAX_IMPORT_BYTES, type ImportMode, type ImportRecipient } from "@/lib/invitation-import";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -98,6 +100,31 @@ export async function sendInviteAction(interviewId: string, email: string): Prom
     const user = await requireUser();
     await sendInvite(user.id, interviewId, z.string().trim().toLowerCase().email().max(200).parse(email));
     revalidatePath(`/dashboard/interviews/${interviewId}`);
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+export async function previewInvitationImportAction(interviewId: string, csv: string, mode: ImportMode): Promise<Result<{ rows: ImportRecipient[] }>> {
+  try {
+    const user = await requireUser();
+    const id = z.string().min(1).max(64).parse(interviewId);
+    const input = z.string().max(MAX_IMPORT_BYTES).parse(csv);
+    const kind = z.enum(["new", "reminder"]).parse(mode);
+    await getOwnedInterview(id, user.id);
+    if (!(await takeRateLimit(`invite-preview:${user.id}`, 60))) throw new PublicError("Preview limit reached. Please wait ten minutes.");
+    return { ok: true, rows: await previewInvitationImport(user.id, id, input, kind) };
+  } catch (e) { return fail(e); }
+}
+
+/** One bounded send per request; previews are never trusted as authorization. */
+export async function sendImportedInvitationAction(interviewId: string, email: string, mode: ImportMode): Promise<Result> {
+  try {
+    const user = await requireUser();
+    const id = z.string().min(1).max(64).parse(interviewId);
+    const address = z.string().trim().toLowerCase().max(200).email().parse(email);
+    const kind = z.enum(["new", "reminder"]).parse(mode);
+    await sendInvite(user.id, id, address, kind);
+    revalidatePath(`/dashboard/interviews/${id}`);
     return { ok: true };
   } catch (e) { return fail(e); }
 }

@@ -7,6 +7,7 @@ import { revokeInviteAction, sendInviteAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BulkInvitationImport } from "@/components/bulk-invitation-import";
 
 export type InvitationRow = {
   id: string; email: string; status: string; expiresAt: string; revoked: boolean; sendCount: number;
@@ -33,7 +34,8 @@ export function InvitationManager({ interviewId, rows }: { interviewId: string; 
         </div>
         <Button disabled={pending} type="submit">Send invitation</Button>
       </form>
-      <ul className="mt-5 divide-y">
+      <BulkInvitationImport interviewId={interviewId} />
+      <ul aria-label="Invitations" className="mt-5 divide-y">
         {rows.map((r) => (
           <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
             <div className="min-w-0">

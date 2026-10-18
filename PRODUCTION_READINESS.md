@@ -186,7 +186,8 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   limits, encryption/backups and deploy object storage when scale requires it.
 - Provider documentation lookup and live email/AI smoke testing require separate
   network/side-effect approval. All automated provider interactions are mocked.
-- Phase 2 personal templates and interview duplication are implemented (see below).
+- Phase 2 personal templates, interview duplication and CSV invitation imports
+  with manually triggered reminders are implemented (see below).
   Other deferred Phase 2 and Phase 3 features are not yet implemented.
 - Comparison currently supports one interview/version, not cross-interview role
   grouping. External managed Postgres and live providers need a staging smoke
@@ -258,3 +259,34 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   Verification confirmed seven migration entries, the new table and index, and
   unchanged interview, response and recording counts. Runtime connection settings
   were not changed. No application deployment was run.
+
+## Bulk Invitations and Manual Reminders (2026-10-18)
+
+- The Invitations tab accepts bounded UTF-8 CSV imports: max 100 KB, 100 recipients
+  and 20 columns. An `email` header is required; `name` is optional and shown only
+  for review. The parser handles BOMs, quoted commas/newlines and escaped quotes.
+- Authenticated, owner-scoped previews flag invalid/duplicate emails, existing
+  invitations, attempt claims and allowlist restrictions. Previewing never creates
+  invitation records or sends email. Every send rechecks server-side eligibility.
+- Confirmation starts sequential, bounded per-recipient requests with individual
+  results. Cancelling stops after the in-flight recipient. Leaving the page stops
+  remaining sends. Network ambiguity stops the batch and is never automatically
+  retried. New-import sends atomically refuse existing invitations, even after a
+  lost response or concurrent submission; they cannot silently rotate old links.
+- Manual reminders require an accepted, unexpired, non-revoked invitation and no
+  candidate attempt. The atomic update enforces a 24-hour wait and a maximum of
+  three total send attempts, including the initial send and failures. Reminders
+  rotate the personal link and explain this in the email. The original explicit
+  Resend action remains available for recruiter-directed recovery.
+- The existing 100 account send attempts/hour limit applies to all send modes.
+  Provider failures are sanitized. Accepted means provider acceptance, not delivery.
+- No new schema, migration, scheduler, durable queue or automatic reminders.
+  Keep the browser open while sending; refresh preview and inspect invitation
+  status before retrying an unconfirmed send. This is not a background bulk job.
+- PASS: 67 unit/integration tests; four real-PostgreSQL tests skipped locally.
+- PASS: all 17 production-build Chromium tests, including bulk sending, invalid/
+  duplicate/existing recipients, cancellation, cooldown and network ambiguity.
+- PASS: lint, production compilation/TypeScript, and desktop/mobile visual review.
+  Mobile controls were adjusted after review; affected browser flows rechecked.
+- Email and AI were mocked and all test databases disposable. No live email was
+  sent, no Neon data changed, and no commit, push or deployment was performed.
