@@ -96,7 +96,7 @@ export default async function InterviewPage(props: PageProps<"/dashboard/intervi
           </div>
         </div>
         <Suspense>
-          <InterviewActions id={iv.id} isActive={iv.isActive} invitationOnly={iv.invitationOnly || !!iv.allowedEmails.length} />
+          <InterviewActions id={iv.id} name={iv.name} isActive={iv.isActive} invitationOnly={iv.invitationOnly || !!iv.allowedEmails.length} />
         </Suspense>
       </div>
 

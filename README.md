@@ -9,6 +9,7 @@ Volo runs first-round hiring interviews for you. Paste a job description and Cla
 - **Reports.** Overall score and hiring recommendation, a communication score, strengths and gaps, verbatim quotes, a summary for each question, the full recording and transcript, and a candidate status (shortlisted, maybe or rejected).
 - **Interview overview.** Completion rate, average score and length, candidate satisfaction, AI insights across all candidates, search and filtering, and CSV export.
 - **Interviewer personas.** Four built in (Lisa, Bob, Aarav, Meera), or create your own with a Sarvam voice and sliders for empathy, depth, rapport and pace.
+- **Personal templates and duplication.** From an interview's **More actions** menu, save its current settings as a named template or open a duplicate in the editor. Use **Templates** in the sidebar to start a new interview or delete a template. Each copy is independent: candidate emails, invitations, responses, recordings and insights are excluded. Restricted intake stays restricted and needs new invitations. A template survives deletion of its source interview; deleting it keeps existing interviews. If its custom interviewer has been deleted, choose a replacement before saving.
 - Dark mode, mobile layouts, keyboard support, and reduced-motion support.
 
 ## Quick start (about 2 minutes)

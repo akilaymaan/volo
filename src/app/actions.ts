@@ -23,6 +23,7 @@ import { withUsage } from "@/lib/usage";
 import { expireAccountData } from "@/lib/retention";
 import { PublicError } from "@/lib/errors";
 import { takeRateLimit } from "@/lib/rate-limit";
+import { deleteTemplate, saveTemplate } from "@/lib/templates";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -73,6 +74,24 @@ const InterviewInput = z.object({
 }).refine((v) => !v.isAnonymous || (!v.invitationOnly && !v.allowedEmails.length),
   "Anonymous interviews cannot require email invitations or an allowlist.");
 export type InterviewInput = z.infer<typeof InterviewInput>;
+
+export async function saveTemplateAction(interviewId: string, name: string): Promise<Result<{ id: string }>> {
+  try {
+    const user = await requireUser();
+    const id = await saveTemplate(user.id, z.string().min(1).max(64).parse(interviewId), name);
+    revalidatePath("/dashboard/templates");
+    return { ok: true, id };
+  } catch (e) { return fail(e); }
+}
+
+export async function deleteTemplateAction(id: string): Promise<Result> {
+  try {
+    const user = await requireUser();
+    await deleteTemplate(user.id, z.string().min(1).max(64).parse(id));
+    revalidatePath("/dashboard/templates");
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
 
 export async function sendInviteAction(interviewId: string, email: string): Promise<Result> {
   try {

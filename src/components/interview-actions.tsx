@@ -1,18 +1,20 @@
 "use client";
 
 import {
+  CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
   MoreHorizontalIcon,
   PencilIcon,
   Share2Icon,
+  FilesIcon,
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { toast } from "sonner";
-import { deleteInterviewAction, setInterviewActiveAction } from "@/app/actions";
+import { deleteInterviewAction, saveTemplateAction, setInterviewActiveAction } from "@/app/actions";
 import { CopyButton } from "@/components/copy-button";
 import {
   AlertDialog,
@@ -46,11 +48,12 @@ import { Textarea } from "@/components/ui/textarea";
 
 const noop = () => () => {};
 
-export function InterviewActions({ id, isActive, invitationOnly }: { id: string; isActive: boolean; invitationOnly: boolean }) {
+export function InterviewActions({ id, name, isActive, invitationOnly }: { id: string; name: string; isActive: boolean; invitationOnly: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [shareOpen, setShareOpen] = useState(() => params.get("share") === "1");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [active, setActive] = useState(isActive);
   const [pending, start] = useTransition();
   // Server render has no origin; React swaps in the browser value right after hydration
@@ -98,6 +101,15 @@ export function InterviewActions({ id, isActive, invitationOnly }: { id: string;
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
+            <Link href={`/dashboard/interviews/new?duplicate=${id}`}>
+              <CopyIcon /> Duplicate interview
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setTemplateOpen(true)}>
+            <FilesIcon /> Save as template
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
             <a href={`/api/interviews/${id}/export`}>
               <DownloadIcon /> Export responses (CSV)
             </a>
@@ -113,6 +125,31 @@ export function InterviewActions({ id, isActive, invitationOnly }: { id: string;
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as template</DialogTitle>
+            <DialogDescription>Save the current interview settings for reuse. Candidate lists, invitations and reports are excluded.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(event) => {
+            event.preventDefault();
+            const label = String(new FormData(event.currentTarget).get("name") ?? "");
+            start(async () => {
+              const res = await saveTemplateAction(id, label);
+              if (!res.ok) return void toast.error(res.error);
+              setTemplateOpen(false);
+              toast.success("Template saved. Find it in Templates.");
+            });
+          }}>
+            <div className="space-y-1.5">
+              <Label htmlFor="template-name">Template name</Label>
+              <Input id="template-name" name="name" defaultValue={name} maxLength={120} required />
+            </div>
+            <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save template"}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
         <DialogContent className="sm:max-w-lg">

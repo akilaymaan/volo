@@ -39,16 +39,17 @@ it("rejects pooled Neon migrations and unsupported parameters before connecting,
   }
 });
 
-it("applies the original history to explicit disposable PGlite and reruns without duplicating seeds", async () => {
+it("applies all migrations to explicit disposable PGlite and reruns without duplicating seeds", async () => {
   const dir = path.join(temp, "pglite");
   const env = { DATABASE_URL: "", DATABASE_MODE: "pglite", PGLITE_DIR: dir, VERCEL: "", RENDER: "" };
   expect((await runMigration(temp, env, ["--local"])).code).toBe(0);
   expect((await runMigration(temp, env, ["--local"])).code).toBe(0);
   const db = new PGlite(dir);
   try {
-    expect((await db.query("select * from drizzle.__drizzle_migrations")).rows).toHaveLength(6);
+    expect((await db.query("select * from drizzle.__drizzle_migrations")).rows).toHaveLength(7);
     expect((await db.query("select * from interviewer")).rows).toHaveLength(4);
     expect((await db.query("select * from usage_event")).rows).toHaveLength(0);
+    expect((await db.query("select * from interview_template")).rows).toHaveLength(0);
   } finally { await db.close(); }
 }, 30_000);
 

@@ -43,6 +43,13 @@
       "when": 1792264836287,
       "tag": "0005_usage_and_retention_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792312764308,
+      "tag": "0006_interview_templates",
+      "breakpoints": true
     }
   ]
 }

@@ -169,6 +169,20 @@ export const interview = pgTable(
   (t) => [index("interview_owner_idx").on(t.ownerId)],
 );
 
+// Reusable settings only: templates never contain candidate data or results.
+export type InterviewConfig = Pick<Interview,
+  "name" | "objective" | "description" | "interviewerId" | "language" | "durationMins" |
+  "questions" | "isAnonymous" | "themeColor" | "logoUrl" | "invitationOnly" | "retentionDays"
+>;
+
+export const interviewTemplate = pgTable("interview_template", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  config: jsonb("config").$type<InterviewConfig>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("interview_template_owner_idx").on(t.ownerId)]);
+
 export const response = pgTable(
   "response",
   {

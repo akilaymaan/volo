@@ -18,7 +18,7 @@ it("upgrades duplicate historical attempts and orphan feedback without deleting 
         VALUES ('legacy-role', 'deleted-before-upgrade', 5, 'Historical orphan'),
                ('legacy-role', 'legacy-done', 4, 'Linked feedback');
     `);
-    for (const name of ["0003_production_foundation", "0004_email_invitations", "0005_usage_and_retention_indexes"])
+    for (const name of ["0003_production_foundation", "0004_email_invitations", "0005_usage_and_retention_indexes", "0006_interview_templates"])
       await client.exec(await readFile(`drizzle/${name}.sql`, "utf8"));
     const attempts = (await client.query("select * from candidate_attempt")).rows;
     expect(attempts).toEqual([{ interview_id: "legacy-role", email: "candidate@example.test", response_id: "legacy-done" }]);
@@ -26,6 +26,7 @@ it("upgrades duplicate historical attempts and orphan feedback without deleting 
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.consented_at === null && r.delete_after === null)).toBe(true);
     expect((await client.query("select * from feedback")).rows).toHaveLength(2);
+    expect((await client.query("select * from interview_template")).rows).toHaveLength(0);
     await client.exec("delete from response where id = 'legacy-done'");
     expect((await client.query("select * from feedback")).rows).toHaveLength(1);
     expect((await client.query("select * from candidate_attempt")).rows).toHaveLength(0);

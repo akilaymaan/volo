@@ -186,7 +186,8 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   limits, encryption/backups and deploy object storage when scale requires it.
 - Provider documentation lookup and live email/AI smoke testing require separate
   network/side-effect approval. All automated provider interactions are mocked.
-- No features from Phases 2 or 3 are claimed as implemented.
+- Phase 2 personal templates and interview duplication are implemented (see below).
+  Other deferred Phase 2 and Phase 3 features are not yet implemented.
 - Comparison currently supports one interview/version, not cross-interview role
   grouping. External managed Postgres and live providers need a staging smoke
   test before a production launch.
@@ -232,3 +233,28 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   authentication limits were not relaxed.
 - Real Resend delivery and paid AI were not invoked. External Postgres was not
   tested. These results are local verification, not a production release signoff.
+
+## Personal Templates and Duplication (2026-10-18)
+
+- Interview **More actions** offers **Duplicate interview** and **Save as template**.
+  Duplicates open a new, unsaved editor for review; saving creates an independent
+  interview. The **Templates** library supports reuse and confirmed deletion.
+- Migration `0006_interview_templates.sql` is additive. Apply it explicitly using
+  the existing migration process before using templates in an existing database.
+  Verification only migrates disposable databases, not the developer's data.
+- Templates snapshot reusable settings and preserve restricted intake. Recipient
+  allowlists, invitations, results, recordings and cached insights are excluded.
+  Templates survive source interview deletion; their deletion leaves interviews
+  already created from them intact. Deleted custom interviewers require a new
+  selection in the editor. Templates are personal, with server-side owner checks
+  on every read and mutation.
+- PASS: 51 unit/integration tests; four real-PostgreSQL tests remain skipped locally.
+- PASS: all 14 Chromium browser tests against the production build, including
+  template snapshot independence, duplication, cross-account denial and deletion.
+- PASS: lint, production compilation/TypeScript, migration upgrade/idempotency,
+  and desktop/mobile template-library visual inspection (390px mobile, no overflow).
+- Test AI and email remain mocked. Subsequently, at the user's request, migration
+  `0006` was applied to the configured Neon database over a direct TLS connection.
+  Verification confirmed seven migration entries, the new table and index, and
+  unchanged interview, response and recording counts. Runtime connection settings
+  were not changed. No application deployment was run.

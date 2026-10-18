@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartNoAxesColumnIcon, LogOutIcon, MenuIcon, MessagesSquareIcon, PlusIcon, UsersRoundIcon } from "lucide-react";
+import { ChartNoAxesColumnIcon, FilesIcon, LogOutIcon, MenuIcon, MessagesSquareIcon, PlusIcon, UsersRoundIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/dashboard", label: "Interviews", icon: MessagesSquareIcon },
   { href: "/dashboard/interviewers", label: "Interviewers", icon: UsersRoundIcon },
+  { href: "/dashboard/templates", label: "Templates", icon: FilesIcon },
   { href: "/dashboard/usage", label: "Usage and privacy", icon: ChartNoAxesColumnIcon },
 ];
 

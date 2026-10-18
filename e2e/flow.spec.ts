@@ -8,6 +8,8 @@ test.describe.configure({ mode: "serial" });
 let interviewUrl = "";
 let interviewId = "";
 let reportId = "";
+let templateId = "";
+let templatedInterviewId = "";
 let recruiterCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | undefined;
 
 async function signIn(page: Page) {
@@ -217,7 +219,61 @@ test("recruiter creates a custom interviewer", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Curious Kiran" })).toBeVisible();
 });
 
-test("other accounts can't see this interview", async ({ browser }) => {
+test("recruiter saves a reusable template and creates an independent interview", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Save as template", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Save as template", exact: true });
+  await dialog.getByLabel("Template name").fill("React hiring template");
+  await dialog.getByRole("button", { name: "Save template", exact: true }).click();
+  await expect(page.getByText("Template saved. Find it in Templates.")).toBeVisible();
+
+  await page.goto(`/dashboard/interviews/${interviewId}/edit`);
+  await page.getByLabel("Objective").fill("Changed after the template was saved.");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page).toHaveURL(new RegExp(`/dashboard/interviews/${interviewId}$`));
+  await page.getByRole("link", { name: "Templates", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "React hiring template" })).toBeVisible();
+  const useTemplate = page.getByRole("link", { name: "Use template React hiring template" });
+  templateId = (await useTemplate.getAttribute("href"))!.split("template=")[1];
+  await page.screenshot({ path: "test-results/templates-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/templates-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await useTemplate.click();
+  await expect(page.getByLabel("Objective")).toHaveValue("Find React engineers who ship production apps.");
+  await expect(page.getByLabel("Question 5")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Empathetic Bob" })).toHaveAttribute("aria-checked", "true");
+  await page.getByLabel("Interview name").fill("Template-based engineer screen");
+  await page.getByRole("button", { name: "Create interview", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Share with candidates" })).toBeVisible();
+  templatedInterviewId = (await page.getByLabel("Interview link").inputValue()).split("/i/")[1];
+  expect(templatedInterviewId).not.toBe(interviewId);
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByText("No finished interviews yet.", { exact: false })).toBeVisible();
+});
+
+test("duplicate interview opens a reviewable copy without existing results", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Duplicate interview", exact: true }).click();
+  await expect(page.getByLabel("Interview name")).toHaveValue("Frontend Engineer screen (copy)");
+  await expect(page.getByLabel("Objective")).toHaveValue("Changed after the template was saved.");
+  await expect(page.getByLabel("Question 5")).toBeVisible();
+  await page.getByRole("button", { name: "Create interview", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Share with candidates" })).toBeVisible();
+  const copyId = (await page.getByLabel("Interview link").inputValue()).split("/i/")[1];
+  expect(copyId).not.toBe(interviewId);
+  await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByText("No finished interviews yet.", { exact: false })).toBeVisible();
+  await page.goto(`/dashboard/interviews/${interviewId}`);
+  await expect(page.getByRole("link", { name: /Asha Tester/ })).toBeVisible();
+});
+
+test("other accounts can't see this interview or reuse its templates", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto("/sign-up");
@@ -232,5 +288,24 @@ test("other accounts can't see this interview", async ({ browser }) => {
   expect((await page.request.get(`/api/recordings/${reportId}`)).status()).toBe(404);
   expect((await page.goto(`/dashboard/interviews/${interviewId}/responses/${reportId}`))?.status()).toBe(404);
   expect((await page.goto(`/dashboard/interviews/${interviewId}/compare?candidate=${reportId}&candidate=other`))?.status()).toBe(404);
+  expect((await page.goto(`/dashboard/interviews/new?duplicate=${interviewId}`))?.status()).toBe(404);
+  expect((await page.goto(`/dashboard/interviews/new?template=${templateId}`))?.status()).toBe(404);
+  await page.goto("/dashboard/templates");
+  await expect(page.getByRole("heading", { name: "No templates yet" })).toBeVisible();
   await ctx.close();
+});
+
+test("deleting a template keeps interviews created from it", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/dashboard/templates");
+  await page.getByRole("button", { name: "Delete template React hiring template" }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Delete template?" });
+  await dialog.getByRole("button", { name: "Keep template" }).click();
+  await expect(page.getByRole("heading", { name: "React hiring template" })).toBeVisible();
+  await page.getByRole("button", { name: "Delete template React hiring template" }).click();
+  await dialog.getByRole("button", { name: "Delete template", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No templates yet" })).toBeVisible();
+  expect((await page.goto(`/dashboard/interviews/new?template=${templateId}`))?.status()).toBe(404);
+  await page.goto(`/dashboard/interviews/${templatedInterviewId}`);
+  await expect(page.getByRole("heading", { name: "Template-based engineer screen", exact: true })).toBeVisible();
 });

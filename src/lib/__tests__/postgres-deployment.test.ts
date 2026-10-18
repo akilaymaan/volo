@@ -30,17 +30,17 @@ describe.skipIf(!raw)("disposable PostgreSQL deployment", () => {
     if (temp) await rm(temp, { recursive: true, force: true });
   });
 
-  it("deploys all six migrations, seeds presets and preserves data on a second run", async () => {
+  it("deploys all seven migrations, seeds presets and preserves data on a second run", async () => {
     const first = await runMigration(temp, { DATABASE_URL: raw });
     expect(first, first.output).toMatchObject({ code: 0 });
     expect(first.output).not.toContain(raw!);
-    expect(await client`select * from drizzle.__drizzle_migrations`).toHaveLength(6);
+    expect(await client`select * from drizzle.__drizzle_migrations`).toHaveLength(7);
     expect(await client`select * from interviewer`).toHaveLength(4);
     await client`insert into "user" (id, name, email) values (${userId}, 'Deployment fixture', ${`${userId}@example.test`})`;
     const repeated = await runMigration(temp, { DATABASE_URL: raw });
     expect(repeated, repeated.output).toMatchObject({ code: 0 });
     expect(await client`select id from "user" where id = ${userId}`).toHaveLength(1);
-    expect(await client`select * from drizzle.__drizzle_migrations`).toHaveLength(6);
+    expect(await client`select * from drizzle.__drizzle_migrations`).toHaveLength(7);
   }, 30_000);
 
   it("runs the rate-limit upsert through the app db layer against real PostgreSQL", async () => {
