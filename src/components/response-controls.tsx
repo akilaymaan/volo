@@ -1,8 +1,8 @@
 "use client";
 
-import { Loader2Icon, RotateCwIcon, Trash2Icon } from "lucide-react";
+import { RotateCwIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteResponseAction, reanalyzeAction, setCandidateStatusAction } from "@/app/actions";
 import {
@@ -118,49 +118,5 @@ export function ResponseControls({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-/** Loads the recording as a blob so seeking works even for MediaRecorder WebM files without duration metadata. */
-export function RecordingPlayer({ responseId }: { responseId: string }) {
-  const [src, setSrc] = useState<string>();
-  const [error, setError] = useState(false);
-  const audio = useRef<HTMLAudioElement>(null);
-
-  useEffect(() => {
-    let url: string | undefined;
-    fetch(`/api/recordings/${responseId}`)
-      .then((r) => (r.ok ? r.blob() : Promise.reject()))
-      .then((b) => {
-        url = URL.createObjectURL(b);
-        setSrc(url);
-      })
-      .catch(() => setError(true));
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [responseId]);
-
-  // Chrome reports Infinity duration for recorder WebM until it has scanned to the end
-  function fixDuration() {
-    const el = audio.current;
-    if (!el || Number.isFinite(el.duration)) return;
-    el.currentTime = 1e7;
-    el.addEventListener("timeupdate", function reset() {
-      el.removeEventListener("timeupdate", reset);
-      el.currentTime = 0;
-    });
-  }
-
-  if (error) return <p className="text-sm text-muted-foreground">The recording couldn&apos;t be loaded.</p>;
-  if (!src)
-    return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2Icon className="size-4 animate-spin" /> Loading recording
-      </p>
-    );
-  return (
-    // biome-ignore lint/a11y/useMediaCaption: the transcript beside the player serves as the caption
-    <audio ref={audio} src={src} controls preload="metadata" onLoadedMetadata={fixDuration} className="w-full" />
   );
 }

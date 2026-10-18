@@ -3,7 +3,8 @@ import { AlertTriangleIcon, ArrowLeftIcon, Loader2Icon, QuoteIcon } from "lucide
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { RecordingPlayer, ResponseControls } from "@/components/response-controls";
+import { ResponseControls } from "@/components/response-controls";
+import { EvidenceLink, RecordingPlayer, RecordingReviewProvider, TranscriptEntry, TurnAudioButton } from "@/components/recording-review";
 import { ScoreRing } from "@/components/score";
 import { PersonaDot } from "@/components/voice-orb";
 import { requireUser } from "@/lib/auth";
@@ -14,6 +15,7 @@ import { db } from "@/lib/db";
 import { response as responseTable } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 import { RUBRIC } from "@/lib/evaluation";
+import { recordingCues } from "@/lib/recording-timeline";
 
 // Covers analyses and insights started from this page via after() / server actions
 export const maxDuration = 300;
@@ -48,7 +50,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
   const rec = a ? RECOMMENDATIONS[a.recommendation] : null;
 
   return (
-    <>
+    <RecordingReviewProvider key={r.id} cues={r.hasRecording ? recordingCues(r.transcript) : []}>
       <AutoRefresh when={analyzing} />
       <Link href={`/dashboard/interviews/${iv.id}`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeftIcon className="size-4" /> {iv.name}
@@ -177,9 +179,9 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
                         {q.summary && <p className="mt-2 text-muted-foreground">{q.summary}</p>}
                         {a.rubricVersion && <p className="mt-2 font-medium">Rubric score: {q.score == null ? "Not assessed" : `${q.score} / 4`}</p>}
                         {q.evidence?.map((e, index) => (
-                          <a key={index} href={`#turn-${e.turnIndex}`} className="mt-2 block text-sm underline underline-offset-4">
+                          <EvidenceLink key={index} index={e.turnIndex}>
                             &ldquo;{e.quote}&rdquo; — transcript turn {e.turnIndex + 1}
-                          </a>
+                          </EvidenceLink>
                         ))}
                         {!!q.strengths?.length && <p className="mt-2 text-sm">Strengths: {q.strengths.join("; ")}</p>}
                         {!!q.improvements?.length && <p className="mt-2 text-sm">Improve: {q.improvements.join("; ")}</p>}
@@ -206,7 +208,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
             ) : (
               <ol className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
                 {r.transcript.map((t, i) => (
-                  <li key={i} id={`turn-${i}`} className="flex scroll-mt-8 gap-2.5">
+                  <TranscriptEntry key={i} index={i}>
                     {t.role === "agent" && persona ? (
                       <PersonaDot color={persona.color} name={persona.name} size={26} />
                     ) : (
@@ -219,14 +221,15 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
                         {t.role === "agent" ? persona?.name ?? "Interviewer" : r.name || "Candidate"}
                       </p>
                       <p className="text-sm">{t.text}</p>
+                      <TurnAudioButton index={i} />
                     </div>
-                  </li>
+                  </TranscriptEntry>
                 ))}
               </ol>
             )}
           </Card>
         </div>
       </div>
-    </>
+    </RecordingReviewProvider>
   );
 }

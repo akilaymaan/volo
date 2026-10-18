@@ -4,7 +4,7 @@ import { LANGUAGES, VOICES } from "@/lib/constants";
 import { withUsage } from "@/lib/usage";
 import { takeRateLimit } from "@/lib/rate-limit";
 
-const SAMPLE: Record<string, string> = {
+const PREVIEW_TEXT: Record<string, string> = {
   "en-IN": "Hi! I'll be your interviewer today. Whenever you're ready, tell me a little about yourself.",
   "hi-IN": "नमस्ते! आज मैं आपका इंटरव्यू लूंगी। जब आप तैयार हों, अपने बारे में थोड़ा बताइए।",
 };
@@ -22,13 +22,13 @@ export async function GET(req: Request) {
   if (!VOICES.some((v) => v.id === voice) || !LANGUAGES.some((l) => l.code === lang))
     return new Response("Bad request", { status: 400 });
 
-  const language = SAMPLE[lang] ? lang : "en-IN";
+  const language = PREVIEW_TEXT[lang] ? lang : "en-IN";
   const key = `${voice}:${language}`;
   try {
     let audio = cache.get(key);
     if (!audio) {
       audio = await withUsage({ accountId: user.id, operation: "voice-preview" },
-        () => synthesize(SAMPLE[language], { language, voice }));
+        () => synthesize(PREVIEW_TEXT[language], { language, voice }));
       cache.set(key, audio);
     }
     return new Response(new Uint8Array(audio), {

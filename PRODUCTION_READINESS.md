@@ -136,7 +136,7 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 2. Use external Postgres for multi-instance/serverless deployment and HTTPS with
    a strong `BETTER_AUTH_SECRET` and explicit `BETTER_AUTH_URL` origin.
 3. Set `RESEND_API_KEY` and a verified `EMAIL_FROM`; first test one recipient you
-   control after approval. Do not enable `EMAIL_MOCK` or `AI_MOCK` in production.
+   control after approval. Production always uses real provider integrations.
    Supply an appropriate hiring/privacy contact in your invitation sender and
    recruiting communications.
 4. Configure model rates in `ANTHROPIC_PRICING_JSON` (USD per million tokens for
@@ -158,12 +158,12 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 - `npm test`: unit tests and in-memory PGlite integration/migration tests, no
   real AI calls, emails or existing-database deletion.
 - `npm run lint`, `npm run typecheck`, `npm run build`.
-- `npm run test:e2e`: production-server signup, creation, candidate voice call,
+- `npm run test:e2e:build` then `npm run test:e2e`: isolated-test-server signup, creation, candidate voice call,
   analysis, recording, CSV, invitations UI, comparison, privacy UI and negative
   access tests. AI and email are mocked; every run creates a new database.
 - Optional isolated build: set `NEXT_BUILD_DIR=.next-verify`,
-  `DATABASE_MODE=postgres`, `DATABASE_URL=` and `AI_MOCK=1` for build.
-  Use the same `NEXT_BUILD_DIR` for typecheck/E2E. `E2E_PORT` chooses a free port.
+  `DATABASE_MODE=postgres`, `DATABASE_URL=` for build.
+  Browser tests use their own `.next-e2e` build. `E2E_PORT` chooses a free port.
   `PLAYWRIGHT_CHROMIUM_EXECUTABLE` can point to an already-installed Chromium;
   otherwise install the revision required by Playwright (network permission).
 - Generated test databases are intentionally not automatically removed. Delete
@@ -187,7 +187,8 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 - Provider documentation lookup and live email/AI smoke testing require separate
   network/side-effect approval. All automated provider interactions are mocked.
 - Phase 2 personal templates, interview duplication and CSV invitation imports
-  with manually triggered reminders are implemented (see below).
+  with manually triggered reminders are implemented, along with audio-linked
+  transcript review (see below).
   Other deferred Phase 2 and Phase 3 features are not yet implemented.
 - Comparison currently supports one interview/version, not cross-interview role
   grouping. External managed Postgres and live providers need a staging smoke
@@ -290,3 +291,57 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   Mobile controls were adjusted after review; affected browser flows rechecked.
 - Email and AI were mocked and all test databases disposable. No live email was
   sent, no Neon data changed, and no commit, push or deployment was performed.
+
+## Audio-Linked Transcript Evidence (2026-10-18)
+
+- New browser recordings capture interviewer playback and candidate answer-segment
+  offsets against the mixed recording's audio clock. Server transcription/write
+  times are never treated as audio positions. Saved-but-lost turn replies still
+  associate the captured answer with its original transcript index.
+- The recording upload accepts bounded, versioned timing metadata with finite
+  integer offsets, ordered unique transcript indices and duration checks. Bytes
+  and cues are saved in one transaction and are write-once together. Replayed or
+  concurrent uploads cannot replace audio or retime an existing recording.
+- Candidate reports offer keyboard-accessible timestamp buttons, audio seeking
+  from question-evidence links, and highlighting of the turn at the playhead.
+  Audio controls wait for metadata/duration discovery, including recorder WebM
+  files without an initial duration. Source blob URLs are revoked on cleanup.
+- Historical recordings without captured positions retain plain transcript links
+  and normal playback. Failed audio loads keep the transcript readable and disable
+  audio shortcuts. No guessed historical timestamps or word-level alignment.
+- Positions are approximate turn starts, including thinking pauses. Browser
+  buffering can shift alignment. Candidate-supplied cues are navigation aids,
+  not scoring or integrity evidence; transcript text and indices are unchanged.
+- No schema migration or new dependency. The optional offset is stored inside
+  the existing transcript JSON alongside its recording. Neon data was not changed.
+- PASS: 78 unit/integration tests; four real-PostgreSQL tests skipped locally.
+- PASS: all 19 production-build Chromium tests, including real browser recording,
+  a simulated lost turn reply, timestamp/evidence seeking, active highlighting,
+  missing timing metadata, recording-load failure and account isolation.
+- PASS: lint, TypeScript, production build, whitespace check, and desktop/mobile
+  visual inspection (390px mobile without horizontal page overflow).
+- AI/audio-provider responses and email were mocked; live voice alignment on
+  Safari/mobile devices still needs a staging check. No commit, push or deployment
+  was performed during feature implementation.
+
+## Production Demo/Mock Removal (2026-10-18)
+
+- Removed runtime AI/email mock switches, scripted questions and assessments,
+  canned transcription, silent speech output, and fake email-success responses.
+  Missing provider credentials now fail instead of returning synthetic results.
+- Removed the landing page's simulated live interview and sample CSV recipients.
+  The downloadable invitation CSV contains headers only. Real voice previews,
+  reusable interviewer configurations and existing customer records are retained.
+- Automated provider doubles live under `e2e/stubs`, outside application source,
+  and are selected only by an explicit `.next-e2e` test build. Ordinary production
+  builds contain no aliases. The test-build guard rejects other output folders
+  and Vercel/Render environments. The Docker runtime copies production output and
+  dependencies only, not test source or local test builds.
+- PASS: 80 unit/integration tests; four real-PostgreSQL tests skipped locally.
+- PASS: all 19 isolated-build Chromium tests, including the full candidate/report
+  flow, header-only CSV template and landing-page desktop/mobile layout checks.
+- PASS: production build, TypeScript, lint and production-bundle marker scan.
+  Regression tests verify that obsolete mock flags cannot bypass real providers.
+- No live AI requests or email sends were used for verification. Disposable local
+  databases were used; Neon data was not changed. Docker execution and live-provider
+  staging checks were not performed. No commit, push or deployment was performed.

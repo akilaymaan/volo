@@ -3,7 +3,6 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { Analytics, Interview, Interviewer, TranscriptTurn } from "@/lib/db/schema";
 import { INTERVIEWER_MODEL, structured } from "./claude";
-import { isMock } from "./mock";
 import { groundAssessment, RUBRIC } from "@/lib/evaluation";
 import {
   ANALYSIS_SYSTEM,
@@ -46,15 +45,6 @@ export async function generateQuestions(input: {
   context: string;
   pdf?: { base64: string };
 }) {
-  if (isMock()) {
-    return {
-      questions: Array.from(
-        { length: input.count },
-        (_, i) => `Mock question ${i + 1}: tell me about your experience relevant to ${input.name}?`,
-      ),
-      description: `You'll chat with an AI interviewer about your background and experience for the ${input.name} role.`,
-    };
-  }
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   // Claude reads the PDF directly — no server-side PDF parsing needed
   if (input.pdf) {
@@ -83,15 +73,6 @@ export async function interviewerTurn(args: {
   transcript: TranscriptTurn[];
   elapsedSec: number;
 }): Promise<{ say: string; end: boolean }> {
-  if (isMock()) {
-    const answered = args.transcript.filter((t) => t.role === "user").length;
-    const qs = args.interview.questions;
-    if (answered === 0)
-      return { say: `Hi ${args.candidateName || "there"}! I'm ${args.interviewer.name}. ${qs[0]?.question ?? "Tell me about yourself."}`, end: false };
-    if (answered >= Math.min(3, qs.length))
-      return { say: "Thank you for your time today. The hiring team will review and follow up. Goodbye!", end: true };
-    return { say: `Thanks. ${qs[answered].question}`, end: false };
-  }
   return structured(TurnSchema, {
     model: INTERVIEWER_MODEL,
     system: interviewerSystemPrompt(args.interview, args.interviewer, args.candidateName),
@@ -139,33 +120,6 @@ export async function analyzeTranscript(
   transcript: TranscriptTurn[],
   interviewerName: string,
 ): Promise<Analytics> {
-  if (isMock()) {
-    const candidateTurns = transcript.map((t, i) => ({ ...t, i })).filter((t) => t.role === "user" && t.text !== "[no response]");
-    return groundAssessment({
-      overallScore: 78,
-      recommendation: "yes",
-      overallFeedback: "Clear, structured answers with relevant examples. Could go deeper on trade-offs.",
-      callSummary: "The candidate discussed their background and recent projects.",
-      sentiment: "positive",
-      communication: { score: 8, feedback: "Fluent and easy to follow." },
-      softSkillSummary: "Confident, adaptable and thoughtful under follow-up questions.",
-      strengths: ["Concrete examples", "Clear communication"],
-      improvements: ["Discuss trade-offs in more depth"],
-      questionSummaries: interview.questions.map((q, i) => ({
-        questionId: q.id,
-        question: q.question,
-        status: candidateTurns[i] ? "answered" : "not_asked",
-        summary: candidateTurns[i] ? "Gave a relevant, well-structured answer." : "",
-        score: candidateTurns[i] ? 3 : null,
-        evidence: candidateTurns[i] ? [{ turnIndex: candidateTurns[i].i, quote: candidateTurns[i].text }] : [],
-        strengths: ["Specific job-relevant examples"],
-        improvements: ["Explain trade-offs"],
-      })),
-      quotes: [
-        { quote: "This is a mock answer from the candidate.", analysis: "Direct and concise.", type: "strength" },
-      ],
-    }, interview, transcript);
-  }
   const out = await structured(AnalyticsSchema, {
     system: `${ANALYSIS_SYSTEM}\nQuestion scoring rubric: ${RUBRIC}`,
     messages: [{ role: "user", content: analysisPrompt(interview, transcript, interviewerName) }],
@@ -190,13 +144,6 @@ export async function generateInsights(
   interview: Interview,
   rows: { summary: string; score: number; recommendation: string }[],
 ) {
-  if (isMock()) {
-    return [
-      "Most candidates explain their past projects clearly with concrete examples.",
-      "Depth on system design trade-offs is the most common gap.",
-      "Communication scores are consistently strong across the pool.",
-    ];
-  }
   const out = await structured(InsightsSchema, {
     system: INSIGHTS_SYSTEM,
     messages: [{ role: "user", content: insightsPrompt(interview, rows) }],

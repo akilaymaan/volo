@@ -27,6 +27,12 @@ vi.mock("@/lib/db", async () => {
   return { db, schema, client };
 });
 vi.mock("next/server", () => ({ after: vi.fn() }));
+vi.mock("@/lib/ai/tasks", () => import("../../../e2e/stubs/tasks"));
+vi.mock("@/lib/ai/sarvam", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/ai/sarvam")>(),
+  transcribe: async (audio: Blob) => audio.size ? "This is a test answer from the candidate." : "",
+  synthesize: async () => Buffer.from("test audio"),
+}));
 vi.mock("@/lib/mail", () => ({ sendInvitationMail: vi.fn().mockResolvedValue({ id: "provider-test" }) }));
 
 const jsonRequest = (path: string, data: object, cookie = "") => new Request(`http://localhost/api/call/${path}`, {
@@ -42,7 +48,6 @@ const makeTurn = (id: string, len: number, cookie: string, silent = false) => {
 };
 
 beforeAll(async () => {
-  vi.stubEnv("AI_MOCK", "1");
   await db.insert(schema.user).values({ id: "owner", name: "Owner", email: "owner@example.test" });
   const [persona] = await db.select().from(schema.interviewer).limit(1);
   await db.insert(schema.interview).values({

@@ -106,6 +106,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
   const startedAt = useRef(0);
   const tabRef = useRef(0);
   const transcriptLen = useRef(0);
+  const recordingOffsets = useRef(new Map<number, number>());
   const invitationToken = useRef<string | undefined>(undefined);
   const inflight = useRef<Promise<unknown> | null>(null);
   const meter = useRef<HTMLSpanElement>(null);
@@ -205,6 +206,12 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
       const form = new FormData();
       form.set("responseId", id);
       form.set("file", recording, "interview");
+      const durationMs = eng?.recordingTimeMs();
+      if (durationMs && durationMs > 0) form.set("timeline", JSON.stringify({
+        version: 1, durationMs,
+        turns: [...recordingOffsets.current.entries()].sort(([a], [b]) => a - b)
+          .map(([turnIndex, offsetMs]) => ({ turnIndex, offsetMs })),
+      }));
       await fetch("/api/call/recording", { method: "POST", body: form }).catch(() => {});
     }
   }, []);
@@ -217,11 +224,12 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
   // ---------- the conversation loop ----------
   const converse = useCallback(async () => {
     const eng = engine.current!;
-    let pending: { chunks?: Blob[]; silent?: boolean } = {};
+    let pending: { chunks?: Blob[]; silent?: boolean; recordingOffsetMs?: number | null } = {};
     let failures = 0;
     while (!ended.current) {
       setLive("thinking");
       const form = new FormData();
+      const expectedLen = transcriptLen.current;
       form.set("responseId", responseId.current);
       form.set("len", String(transcriptLen.current));
       if (pending.silent) form.set("silent", "1");
@@ -253,6 +261,10 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
       if (ended.current) return;
       failures = 0;
       if (typeof reply.len === "number") transcriptLen.current = reply.len;
+      // A saved-but-lost reply replays with empty userText; the transcript position
+      // still identifies the answer that was just recorded before that request.
+      if (!reply.retry && reply.len === expectedLen + 2 && pending.recordingOffsetMs != null)
+        recordingOffsets.current.set(expectedLen, pending.recordingOffsetMs);
 
       if (reply.retry) {
         setHint("Sorry, I didn't catch that. Please answer again.");
@@ -265,7 +277,9 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
         ]);
         if (reply.audio) {
           setLive("speaking");
-          await eng.play(b64ToBuffer(reply.audio)).catch(() => {});
+          await eng.play(b64ToBuffer(reply.audio), (offset) => {
+            recordingOffsets.current.set(reply.len - 1, offset);
+          }).catch(() => {});
         }
         if (reply.end || ended.current) {
           await finish();
@@ -276,7 +290,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
       setLive("listening");
       const heard = await eng.listen();
       if (ended.current) return;
-      pending = heard.chunks.length ? { chunks: heard.chunks } : { silent: true };
+      pending = heard.chunks.length ? { chunks: heard.chunks, recordingOffsetMs: heard.recordingOffsetMs } : { silent: true };
     }
   }, [finish]);
 

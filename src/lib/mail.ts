@@ -3,8 +3,6 @@ import "server-only";
 export type InvitationMail = { email: string; interviewName: string; url: string; expiresAt: Date; deliveryKey: string; reminder?: boolean };
 
 export async function sendInvitationMail(mail: InvitationMail) {
-  // The test/demo transport must be explicitly opted into along with fake AI.
-  if (process.env.EMAIL_MOCK === "1" && process.env.AI_MOCK === "1") return { id: "mock-email" };
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)
     throw new Error("Email delivery is not configured. Set RESEND_API_KEY and EMAIL_FROM.");
   const res = await fetch("https://api.resend.com/emails", {

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.E2E_PORT || 3100);
 
-// Runs against a production build (`npm run build` first) with fake AI/voice and a throwaway database.
+// Uses an isolated test build; ordinary production builds always use real providers.
 export default defineConfig({
   testDir: "e2e",
   timeout: 120_000,
@@ -26,13 +26,17 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
-      AI_MOCK: "1",
+      NEXT_BUILD_DIR: ".next-e2e",
+      VOLO_E2E_BUILD: "1",
       PGLITE_DIR: `.data/e2e-${randomUUID()}`,
       DATABASE_URL: "",
       DATABASE_MODE: "pglite",
       BETTER_AUTH_SECRET: "e2e-only-secret-not-for-production-use",
       BETTER_AUTH_URL: `http://localhost:${PORT}`,
-      EMAIL_MOCK: "1",
+      ANTHROPIC_API_KEY: "test-only-not-a-provider-key",
+      SARVAM_API_KEY: "test-only-not-a-provider-key",
+      RESEND_API_KEY: "test-only-not-a-provider-key",
+      EMAIL_FROM: "test@example.test",
       RETENTION_CRON_SECRET: "e2e-maintenance-secret-not-for-production",
       RETENTION_ENABLED: "0",
     },

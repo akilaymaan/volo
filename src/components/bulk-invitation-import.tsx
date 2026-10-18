@@ -110,7 +110,7 @@ export function BulkInvitationImport({ interviewId }: { interviewId: string }) {
           <h3 id="bulk-invitations-heading" className="font-semibold">Bulk invitations and reminders</h3>
           <p className="mt-1 text-sm text-muted-foreground">Upload up to 100 recipients with an email column and an optional name column. Review the preview before sending.</p>
         </div>
-        <a download="invitation-example.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,email\nAsha,asha@example.com\nRavi,ravi@example.com\n")}`} className="text-sm underline underline-offset-4">Download example CSV</a>
+        <a download="invitation-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,email\n")}`} className="text-sm underline underline-offset-4">Download CSV template</a>
       </div>
       <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap sm:items-end">
         <div className="space-y-1.5 sm:w-44">

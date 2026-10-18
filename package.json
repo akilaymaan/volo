@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:build": "node e2e/build.mjs",
     "db:generate": "drizzle-kit generate",
     "db": "node scripts/migrate.mjs",
     "db:migrate": "npm run db",

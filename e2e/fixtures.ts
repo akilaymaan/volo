@@ -1,4 +1,4 @@
-// Throwaway account used only against the local embedded database in AI_MOCK mode.
+// Throwaway account used only against a disposable local test database.
 export const TEST_USER = {
   name: "Priya Recruiter",
   email: "recruiter@example.test",

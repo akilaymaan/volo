@@ -10,6 +10,7 @@ Volo runs first-round hiring interviews for you. Paste a job description and Cla
 - **Interview overview.** Completion rate, average score and length, candidate satisfaction, AI insights across all candidates, search and filtering, and CSV export.
 - **Interviewer personas.** Four built in (Lisa, Bob, Aarav, Meera), or create your own with a Sarvam voice and sliders for empathy, depth, rapport and pace.
 - **Personal templates and duplication.** From an interview's **More actions** menu, save its current settings as a named template or open a duplicate in the editor. Use **Templates** in the sidebar to start a new interview or delete a template. Each copy is independent: candidate emails, invitations, responses, recordings and insights are excluded. Restricted intake stays restricted and needs new invitations. A template survives deletion of its source interview; deleting it keeps existing interviews. If its custom interviewer has been deleted, choose a replacement before saving.
+- **Audio-linked evidence.** New recorded interviews capture turn-level audio positions. Click a transcript timestamp or a question's evidence link to play the relevant segment; the current transcript turn is highlighted during playback. Older recordings remain playable with plain transcript links when timing was not captured.
 - Dark mode, mobile layouts, keyboard support, and reduced-motion support.
 
 ## Quick start (about 2 minutes)
@@ -35,7 +36,8 @@ npm run dev
 
 Open <http://localhost:3000> and create an account. The example configuration explicitly selects local PGlite in `./.data`. Run `npm run db:local` again when new migrations are added, with the local server stopped. Existing local env files need `DATABASE_MODE=pglite` and an empty `DATABASE_URL`.
 
-> **No keys yet?** Set `AI_MOCK=1` to try the whole product with a scripted interviewer and placeholder voice.
+The app requires real provider credentials. Missing keys produce a setup error;
+there is no demo mode or fake AI/email fallback.
 
 ## Invitations, reports and privacy
 
@@ -79,6 +81,24 @@ Open <http://localhost:3000> and create an account. The example configuration ex
 
 For scheduled retention, deployment requirements, limitations and verification,
 see [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+
+## Reviewing recordings
+
+Open a candidate report to use the recording alongside its transcript. Timestamp
+buttons become available when the audio has loaded. Evidence links under
+**Question by question** seek to the cited turn and scroll to its transcript.
+If audio cannot load, the text and ordinary transcript links remain available.
+
+Positions are captured from the browser's recording audio clock, rather than
+the server's transcription time. They mark approximate turn/answer-segment
+starts, including thinking pauses, not the exact word containing a quote.
+Browser buffering can affect alignment. These candidate-supplied positions are
+navigation aids and are not used for scoring or integrity checks.
+
+Timing metadata is validated and saved atomically with the first recording
+upload. Subsequent uploads cannot replace the bytes or retime the transcript.
+Missing timings are not reconstructed for historical reports. This feature
+uses the existing transcript JSON storage and requires no database migration.
 
 ## Deploying
 
@@ -150,7 +170,6 @@ browser mic ──► voice activity detection (splits answers into clips under 
 | `CLAUDE_INTERVIEWER_MODEL` | `claude-haiku-5-5` | The live interviewer. A fast model keeps the wait between turns short |
 | `SARVAM_STT_MODEL` | `saaras:v4` | Speech-to-text model |
 | `SARVAM_TTS_MODEL` | `bulbul:v3` | Text-to-speech model |
-| `AI_MOCK` | off | `1` replaces Claude and Sarvam with deterministic fakes |
 
 ## Development
 
@@ -159,13 +178,19 @@ npm run db:local     # explicitly initialize/migrate local PGlite (server stoppe
 npm run dev          # app; no migration side effects
 npm test             # unit tests (Vitest)
 npm run build        # production build
-npm run test:e2e     # full end-to-end flow in Chromium with a fake mic (run after build)
+npm run test:e2e:build # isolated .next-e2e build with test-only provider doubles
+npm run test:e2e     # end-to-end tests against that isolated build and a disposable DB
 npm run typecheck
 npm run db:generate  # after editing src/lib/db/schema.ts
 npm run db           # approved direct PostgreSQL connection only
 ```
 
 The end-to-end suite signs up, creates an interview, completes a voice interview as a candidate, reviews the report, exports CSV, generates insights, and checks that other accounts can't see your data.
+
+Test doubles live under `e2e/stubs`, outside application source. Only the explicit
+local test build aliases providers to them. Normal `npm run build` deployments use
+real providers; test aliases are rejected on Vercel/Render and cannot use the
+production build directory. The Docker runtime excludes test sources and builds.
 
 **Project map:**
 

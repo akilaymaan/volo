@@ -14,7 +14,7 @@ export type ListenOptions = {
   noSpeechMs?: number;
 };
 
-export type ListenResult = { chunks: Blob[]; silent: boolean };
+export type ListenResult = { chunks: Blob[]; silent: boolean; recordingOffsetMs: number | null };
 
 export function pickMimeType() {
   const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
@@ -89,6 +89,8 @@ export class VoiceEngine {
   private mix: MediaStreamAudioDestinationNode;
   private callRecorder: MediaRecorder | null = null;
   private callChunks: Blob[] = [];
+  private recordingStartedAt: number | null = null;
+  private recordingStoppedAt: number | null = null;
   private buf = new Float32Array(1024);
   private finishRequested = false;
   private current: AudioBufferSourceNode | null = null;
@@ -115,26 +117,36 @@ export class VoiceEngine {
   agentLevel = () => Math.min(1, rms(this.agentAnalyser, this.buf) * 5);
 
   startCallRecording() {
-    if (!this.mimeType) return;
+    if (!this.mimeType || this.callRecorder) return;
     this.callRecorder = new MediaRecorder(this.mix.stream, {
       mimeType: this.mimeType,
       audioBitsPerSecond: 24_000,
     });
     this.callRecorder.ondataavailable = (e) => e.data.size && this.callChunks.push(e.data);
     this.callRecorder.start(5000);
+    this.recordingStartedAt = this.ctx.currentTime;
+  }
+
+  /** Same audio clock as the mixed recording, independent of server/network latency. */
+  recordingTimeMs(): number | null {
+    if (this.recordingStartedAt === null) return null;
+    return Math.max(0, Math.round(((this.recordingStoppedAt ?? this.ctx.currentTime) - this.recordingStartedAt) * 1000));
   }
 
   stopCallRecording(): Promise<Blob | null> {
     const rec = this.callRecorder;
     if (!rec || rec.state === "inactive") return Promise.resolve(null);
     return new Promise((resolve) => {
-      rec.onstop = () => resolve(new Blob(this.callChunks, { type: this.mimeType.split(";")[0] }));
+      rec.onstop = () => {
+        this.recordingStoppedAt = this.ctx.currentTime;
+        resolve(new Blob(this.callChunks, { type: this.mimeType.split(";")[0] }));
+      };
       rec.stop();
     });
   }
 
   /** Plays interviewer audio; resolves when it finishes (or is stopped). */
-  async play(bytes: ArrayBuffer) {
+  async play(bytes: ArrayBuffer, onStart?: (offsetMs: number) => void) {
     if (this.ctx.state === "suspended") await this.ctx.resume();
     const audio = await this.ctx.decodeAudioData(bytes);
     return new Promise<void>((resolve) => {
@@ -147,6 +159,8 @@ export class VoiceEngine {
       };
       this.current = src;
       src.start();
+      const offset = this.recordingTimeMs();
+      if (offset !== null) onStart?.(offset);
     });
   }
 
@@ -168,6 +182,7 @@ export class VoiceEngine {
     this.finishRequested = false;
     const chunks: Blob[] = [];
     const start = performance.now();
+    const recordingOffsetMs = this.recordingTimeMs();
     const detector = new TurnDetector(start, o);
     let recorder = this.newSegment(chunks);
 
@@ -185,7 +200,7 @@ export class VoiceEngine {
         clearInterval(timer);
         // A manual "done" keeps the segment even if VAD never heard speech (quiet voices)
         await this.stopSegment(recorder, detector.hadSpeech || this.finishRequested);
-        resolve({ chunks: [...chunks], silent: action === "silent" && chunks.length === 0 });
+        resolve({ chunks: [...chunks], silent: action === "silent" && chunks.length === 0, recordingOffsetMs });
       }, 50);
     });
   }

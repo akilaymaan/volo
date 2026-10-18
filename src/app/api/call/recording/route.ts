@@ -3,6 +3,8 @@ import { json, loadCall } from "@/lib/call";
 import { LIMITS } from "@/lib/constants";
 import { db } from "@/lib/db";
 import { recording, response } from "@/lib/db/schema";
+import { applyRecordingTimeline, parseRecordingTimeline } from "@/lib/recording-timeline";
+import { PublicError } from "@/lib/errors";
 
 export const maxDuration = 60;
 
@@ -24,13 +26,22 @@ export async function POST(req: Request) {
   if (Date.now() - call.response.createdAt.getTime() > 3 * 60 * 60 * 1000)
     return json({ error: "Upload window closed" }, 410);
 
+  let transcript;
+  try {
+    transcript = applyRecordingTimeline(call.response.transcript,
+      parseRecordingTimeline(form.get("timeline"), call.response.transcript.length, Date.now() - call.response.createdAt.getTime()));
+  } catch (error) {
+    if (error instanceof PublicError) return json({ error: error.message }, 400);
+    throw error;
+  }
   const data = Buffer.from(await file.arrayBuffer());
   await db.transaction(async (tx) => {
-    await tx
+    const inserted = await tx
       .insert(recording)
       .values({ responseId: call.response.id, mime, data })
-      .onConflictDoNothing({ target: recording.responseId });
-    await tx.update(response).set({ hasRecording: true }).where(eq(response.id, call.response.id));
+      .onConflictDoNothing({ target: recording.responseId }).returning({ id: recording.responseId });
+    // Recording bytes and cues are one write-once pair; retries cannot retime an existing upload.
+    if (inserted.length) await tx.update(response).set({ hasRecording: true, transcript }).where(eq(response.id, call.response.id));
   });
   return json({ ok: true });
 }

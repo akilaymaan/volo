@@ -53,8 +53,8 @@ client JavaScript, build logs, or a `NEXT_PUBLIC_*` variable.
 | `RETENTION_ENABLED` | Default `0`; explicitly set `1` only after approving scheduled erasure |
 | `ANTHROPIC_PRICING_JSON`, `SARVAM_TTS_USD_PER_MILLION_CHARACTERS` | Optional contracted pricing; unknown costs remain unpriced |
 
-Optional AI model overrides are listed in `.env.example`. Never enable `AI_MOCK`
-or `EMAIL_MOCK` in a real production environment. Do not set local `PGLITE_DIR`
+Optional AI model overrides are listed in `.env.example`. The app has no AI/email
+mock mode or fake provider fallback. Do not set local `PGLITE_DIR`
 as a substitute for PostgreSQL. Explicit PGlite mode is rejected on Vercel/Render.
 
 Use a separate Neon branch/database and separate secrets for previews/staging.

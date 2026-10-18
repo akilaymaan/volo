@@ -19,7 +19,7 @@ export default async function UsagePage() {
   const due = await expireAccountData(user.id);
   return <>
     <h1 className="text-3xl font-bold">Usage and privacy</h1>
-    <p className="mt-2 text-muted-foreground">All-time account activity. Mock AI calls are not billed or recorded.</p>
+    <p className="mt-2 text-muted-foreground">All-time recorded provider activity for your account.</p>
     <div className="my-6 grid gap-4 sm:grid-cols-3">
       <div className="rounded-xl border bg-card p-5"><p>Successful provider calls</p><strong className="text-2xl">{total.calls}</strong></div>
       <div className="rounded-xl border bg-card p-5"><p>Estimated priced usage (USD)</p><strong className="text-2xl">${(total.microusd / 1_000_000).toFixed(4)}</strong></div>

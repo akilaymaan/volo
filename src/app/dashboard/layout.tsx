@@ -3,10 +3,7 @@ import { requireUser } from "@/lib/auth";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requireUser();
-  const missing =
-    process.env.AI_MOCK === "1"
-      ? []
-      : ["ANTHROPIC_API_KEY", "SARVAM_API_KEY"].filter((k) => !process.env[k]);
+  const missing = ["ANTHROPIC_API_KEY", "SARVAM_API_KEY"].filter((k) => !process.env[k]);
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <AppNav name={user.name} email={user.email} />

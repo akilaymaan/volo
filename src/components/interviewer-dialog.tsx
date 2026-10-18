@@ -84,7 +84,7 @@ export function InterviewerDialog({
             <VoiceOrb color={v.color} size={72} />
             <div className="flex-1 space-y-1.5">
               <Label htmlFor="iv-name">Name</Label>
-              <Input id="iv-name" value={v.name} maxLength={60} placeholder="Curious Kiran" onChange={(e) => set("name", e.target.value)} />
+              <Input id="iv-name" value={v.name} maxLength={60} placeholder="Interviewer name" onChange={(e) => set("name", e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -94,7 +94,7 @@ export function InterviewerDialog({
               rows={2}
               maxLength={500}
               value={v.description}
-              placeholder="Friendly and thorough. Great for product and design roles."
+              placeholder="Describe this interviewer's approach and suitable roles."
               onChange={(e) => set("description", e.target.value)}
             />
           </div>

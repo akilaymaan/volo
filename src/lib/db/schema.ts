@@ -89,7 +89,7 @@ export const verification = pgTable(
 // ---------- app tables ----------
 
 export type Question = { id: string; question: string; followUps: number };
-export type TranscriptTurn = { role: "agent" | "user"; text: string; at: number };
+export type TranscriptTurn = { role: "agent" | "user"; text: string; at: number; recordingOffsetMs?: number };
 export type InterviewSnapshot = Pick<Interview, "name" | "objective" | "questions" | "language" | "durationMins"> & {
   persona?: Pick<Interviewer, "id" | "name" | "description" | "voice" | "color" | "empathy" | "exploration" | "rapport" | "speed">;
 };

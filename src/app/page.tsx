@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand";
-import { HeroDemo } from "@/components/hero-demo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { getUser } from "@/lib/auth";
@@ -65,17 +64,17 @@ export default async function Home() {
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-20 pt-10 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-16">
+        <section className="mx-auto w-full max-w-4xl px-4 pb-20 pt-10 text-center sm:px-6 lg:pt-16">
           <div>
-            <h1 className="max-w-xl text-4xl font-bold leading-[1.05] sm:text-6xl">
+            <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-[1.05] sm:text-6xl">
               First-round interviews, spoken in your candidate&apos;s language.
             </h1>
-            <p className="mt-6 max-w-lg text-lg text-muted-foreground">
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
               Paste a job description. Volo writes the questions, runs a live voice interview in
               English or ten Indian languages, and hands you a scored report with the recording and
               transcript.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" className="h-11 px-5 text-base">
                 <Link href={user ? "/dashboard/interviews/new" : "/sign-up"}>Create your first interview</Link>
               </Button>
@@ -85,7 +84,6 @@ export default async function Home() {
             </div>
             <p className="mt-4 text-sm text-muted-foreground">Free and open source. Self-host in minutes.</p>
           </div>
-          <HeroDemo />
         </section>
 
         <section id="how-it-works" className="border-y bg-card">

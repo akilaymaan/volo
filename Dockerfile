@@ -9,7 +9,9 @@ FROM node:24.13.0-slim
 WORKDIR /app
 ENV NODE_ENV=production
 ENV DATABASE_MODE=postgres
-COPY --from=build /app ./
+COPY --from=build /app/package.json /app/package-lock.json /app/next.config.ts ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
 EXPOSE 3000
 # Apply migrations separately; supply the pooled DATABASE_URL only at runtime.
 CMD ["npm", "start"]

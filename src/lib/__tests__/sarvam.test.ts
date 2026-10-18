@@ -7,7 +7,6 @@ afterEach(() => {
 });
 
 it("uploads recorder audio without the codecs parameter Sarvam rejects", async () => {
-  vi.stubEnv("AI_MOCK", "0");
   vi.stubEnv("SARVAM_API_KEY", "test");
   let sent: File | undefined;
   vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {

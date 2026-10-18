@@ -28,6 +28,13 @@ async function signIn(page: Page) {
 }
 
 test("dashboard requires an account", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Live interview", { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/landing-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/landing-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/sign-in$/);
   const res = await page.request.get("/api/interviews/anything/export");
@@ -60,6 +67,16 @@ test("recruiter signs up and creates an interview", async ({ page }) => {
 });
 
 test("candidate completes a voice interview", async ({ page }) => {
+  // Let the server save one answer, then lose its reply. The replay must retain
+  // the original answer's recording position even though userText comes back empty.
+  let lostReply = false;
+  await page.route("**/api/call/turn", async (route) => {
+    if (!lostReply && route.request().postDataBuffer()?.includes(Buffer.from('name="chunk"'))) {
+      lostReply = true;
+      await route.fetch();
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Simulated lost reply" }) });
+    } else await route.continue();
+  });
   await page.goto(`/i/${interviewId}`);
   await expect(page.getByRole("heading", { name: "Frontend Engineer screen" })).toBeVisible();
   await page.getByLabel("Your name").fill("Asha Tester");
@@ -84,6 +101,7 @@ test("candidate completes a voice interview", async ({ page }) => {
     await page.waitForTimeout(300);
   }
   await expect(thanks).toBeVisible({ timeout: 30_000 });
+  expect(lostReply).toBe(true);
   await page.getByRole("radio", { name: "5 out of 5" }).click();
   await page.getByRole("button", { name: "Send feedback" }).click();
   await expect(page.getByText("Thanks for the feedback")).toBeVisible();
@@ -137,10 +155,28 @@ test("recruiter reviews the scored report", async ({ page }) => {
   reportId = page.url().split("/responses/")[1];
   await expect(page.getByRole("heading", { name: "Asha Tester" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Overall: 75 out of 100" })).toBeVisible();
-  await expect(page.getByText("This is a mock answer from the candidate.").first()).toBeVisible();
+  await expect(page.getByText("This is a test answer from the candidate.").first()).toBeVisible();
   await expect(page.locator("audio")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("AI assessment — human review required.", { exact: false })).toBeVisible();
   await expect(page.getByText("Rubric score: 3 / 4").first()).toBeVisible();
+
+  const answerAudio = page.getByRole("button", { name: /^Play transcript turn 2 at/ });
+  await expect(answerAudio).toBeEnabled({ timeout: 15_000 });
+  const offset = Number(await answerAudio.getAttribute("data-offset-ms"));
+  expect(offset).toBeGreaterThan(0);
+  await answerAudio.click();
+  const playedAt = await page.locator("audio").evaluate((element) => { const audio = element as HTMLAudioElement; audio.pause(); return audio.currentTime; });
+  expect(Math.abs(playedAt - offset / 1000)).toBeLessThan(0.35);
+  await expect(page.locator("#turn-1")).toHaveAttribute("aria-current", "true");
+  await page.getByRole("link", { name: "Play evidence from transcript turn 2", exact: true }).click();
+  const evidenceAt = await page.locator("audio").evaluate((element) => { const audio = element as HTMLAudioElement; audio.pause(); return audio.currentTime; });
+  expect(Math.abs(evidenceAt - offset / 1000)).toBeLessThan(0.35);
+  await expect(page).toHaveURL(/#turn-1$/);
+  await page.screenshot({ path: "test-results/recording-review-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/recording-review-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.getByRole("combobox", { name: "Candidate status" }).click();
   await page.getByRole("option", { name: "Shortlisted" }).click();
@@ -162,11 +198,52 @@ test("recruiter reviews the scored report", async ({ page }) => {
   await expect(page.getByText("invited@example.test", { exact: true })).toBeVisible();
 });
 
+test("reports without captured timestamps retain recording playback and plain transcript links", async ({ page, request }) => {
+  await signIn(page);
+  const audio = await page.request.get(`/api/recordings/${reportId}`);
+  expect(audio.status()).toBe(200);
+  const begun = await request.post("/api/call/start", { data: {
+    interviewId, name: "Legacy Timing", email: "legacy-timing@example.test", consentVersion: CONSENT_VERSION,
+  } });
+  const { responseId } = await begun.json();
+  let len = 0;
+  for (let i = 0; i < 4; i++) {
+    const result = await request.post("/api/call/turn", { multipart: {
+      responseId, len: String(len),
+      ...(i ? { chunk: { name: "answer.webm", mimeType: "audio/webm", buffer: Buffer.from("mock answer") } } : {}),
+    } });
+    expect(result.status()).toBe(200);
+    len = (await result.json()).len;
+  }
+  expect((await request.post("/api/call/end", { data: { responseId } })).status()).toBe(200);
+  // Old clients upload audio without a timeline. No server-created timestamp is substituted.
+  expect((await request.post("/api/call/recording", { multipart: {
+    responseId, file: { name: "legacy.webm", mimeType: "audio/webm", buffer: await audio.body() },
+  } })).status()).toBe(200);
+  await page.goto(`/dashboard/interviews/${interviewId}/responses/${responseId}`);
+  await expect(page.getByText("Audio timestamps were not captured for this interview.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Play transcript turn/ })).toHaveCount(0);
+  await expect(page.locator('a[href="#turn-1"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("audio")).toBeVisible();
+});
+
+test("recording failures leave the transcript readable and audio shortcuts disabled", async ({ page }) => {
+  await signIn(page);
+  await page.route(`**/api/recordings/${reportId}`, (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.goto(`/dashboard/interviews/${interviewId}/responses/${reportId}`);
+  await expect(page.getByText("The recording couldn't be loaded.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Play transcript turn 2 at/ })).toBeDisabled();
+  await expect(page.locator("#turn-1")).toContainText("This is a test answer from the candidate.");
+  await expect(page.locator('a[href="#turn-1"]').first()).toBeVisible();
+});
+
 test("recruiter previews CSV recipients, sends eligible invitations and cannot import them twice", async ({ page }) => {
   await signIn(page);
   await page.goto(`/dashboard/interviews/${interviewId}`);
   await page.getByRole("tab", { name: "Invitations", exact: true }).click();
   const bulk = page.getByRole("region", { name: "Bulk invitations and reminders" });
+  const template = await bulk.getByRole("link", { name: "Download CSV template" }).getAttribute("href");
+  expect(decodeURIComponent(template!.split(",").slice(1).join(","))).toBe("name,email\n");
   await bulk.getByLabel("Recipient CSV").setInputFiles({
     name: "recipients.csv", mimeType: "text/csv",
     buffer: Buffer.from("name,email\nAsha,asha@example.test\nInvited,invited@example.test\nNew One,bulk-one@example.test\nNew Two,bulk-two@example.test\nDuplicate,BULK-ONE@example.test\nInvalid,not-an-email\n"),

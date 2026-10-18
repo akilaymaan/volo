@@ -148,7 +148,7 @@ export function InterviewEditor({
               id="name"
               value={v.name}
               maxLength={120}
-              placeholder="Senior Backend Engineer, first round"
+              placeholder="Role and interview round"
               onChange={(e) => set("name", e.target.value)}
               className="h-10"
             />
@@ -159,7 +159,7 @@ export function InterviewEditor({
               id="objective"
               value={v.objective}
               rows={3}
-              placeholder="Find engineers with 4+ years of Go or Java who have owned production services, can reason about scaling trade-offs, and communicate clearly."
+              placeholder="Describe the skills and experience this interview should assess."
               onChange={(e) => set("objective", e.target.value)}
             />
           </div>
@@ -362,7 +362,7 @@ export function InterviewEditor({
               value={v.description}
               rows={3}
               maxLength={1000}
-              placeholder="You'll have a relaxed 10-minute voice conversation about your recent projects and how you approach problems."
+              placeholder="Describe what candidates should expect from this interview."
               onChange={(e) => set("description", e.target.value)}
             />
           </div>

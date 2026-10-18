@@ -73,8 +73,8 @@ Everything in this table is server-side. Never prefix credentials with
 | `DATABASE_URL` | Pooled URL for confirmed production branch | Pooled URL for isolated preview/staging branch; never production by default | Empty for PGlite, otherwise a development DB URL |
 | `BETTER_AUTH_URL` | Exact canonical HTTPS app origin, no `/api/auth` suffix | Exact HTTPS preview origin; a stable staging hostname simplifies this | `http://localhost:3000` |
 | `BETTER_AUTH_SECRET` | Strong stable random secret, 32+ characters | Separate stable non-production secret | Separate development secret |
-| `ANTHROPIC_API_KEY` | Real Claude access | Restricted non-production access for approved live tests | Development key or explicit mock mode |
-| `SARVAM_API_KEY` | Real STT and TTS access; one shared provider credential | Restricted non-production access for approved live tests | Development key or explicit mock mode |
+| `ANTHROPIC_API_KEY` | Real Claude access | Restricted non-production access for approved live tests | Development key |
+| `SARVAM_API_KEY` | Real STT and TTS access; one shared provider credential | Restricted non-production access for approved live tests | Development key |
 | `RESEND_API_KEY` | Required for email invitations | Test/restricted mail access if testing invitations | Optional |
 | `EMAIL_FROM` | Verified Resend sender for invitations | Verified allowed test sender | Optional |
 | `RETENTION_CRON_SECRET` | Independent 32+ character secret if maintenance is configured | Separate secret, if used | Optional |
@@ -85,7 +85,6 @@ Everything in this table is server-side. Never prefix credentials with
 | `SARVAM_TTS_MODEL` | Optional override; default `bulbul:v3` | Match intended tested model | Optional |
 | `ANTHROPIC_PRICING_JSON` | Optional contracted token pricing | Optional test pricing | Optional |
 | `SARVAM_TTS_USD_PER_MILLION_CHARACTERS` | Optional contracted pricing | Optional | Optional |
-| `AI_MOCK`, `EMAIL_MOCK` | Unset/`0` for real service | Normally unset/`0` for real-provider validation; explicitly label mocked previews | May be `1` for a demo |
 | `PGLITE_DIR` | Do not use | Do not use | Optional path, default `.data/pglite` |
 | `NEXT_BUILD_DIR` | Leave unset | Leave unset | Optional isolated build directory |
 

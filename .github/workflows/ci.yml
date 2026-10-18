@@ -22,7 +22,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      AI_MOCK: "1"
       DATABASE_URL: ""
       DATABASE_MODE: postgres
       TEST_POSTGRES_URL: postgresql://volo_test:volo_disposable_test_only@127.0.0.1:5432/volo_deploy_test?sslmode=disable
@@ -39,5 +38,6 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run test:e2e:build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
