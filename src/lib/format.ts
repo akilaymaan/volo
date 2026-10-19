@@ -4,8 +4,8 @@ export const fmtDuration = (sec: number) => (sec < 60 ? `${sec}s` : `${Math.roun
 export function analysisState(r: {
   analysisStatus: "pending" | "running" | "done" | "failed";
   analysisStartedAt: Date | null;
-}): "running" | "done" | "failed" {
+}, now = Date.now()): "running" | "done" | "failed" {
   if (r.analysisStatus === "done" || r.analysisStatus === "failed") return r.analysisStatus;
-  const fresh = r.analysisStartedAt && Date.now() - r.analysisStartedAt.getTime() < 5 * 60_000;
+  const fresh = r.analysisStartedAt && now - r.analysisStartedAt.getTime() < 5 * 60_000;
   return fresh ? "running" : "failed";
 }

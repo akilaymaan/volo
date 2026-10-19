@@ -68,7 +68,7 @@ describe.skipIf(!raw)("disposable PostgreSQL deployment", () => {
     expect(released, released.output).toMatchObject({ code: 0 });
   }, 30_000);
 
-  it("supports the existing Drizzle transactions, JSONB and BYTEA mapping", async () => {
+  it("supports Drizzle transactions, JSONB, BYTEA and owner-scoped inbox queries", async () => {
     const db = drizzle(client, { schema });
     const interviewId = `interview-${randomUUID()}`;
     const responseId = `response-${randomUUID()}`;
@@ -80,5 +80,14 @@ describe.skipIf(!raw)("disposable PostgreSQL deployment", () => {
     });
     expect((await db.select().from(schema.response).where(eq(schema.response.id, responseId)))[0].transcript).toEqual(turns);
     expect((await db.select().from(schema.recording).where(eq(schema.recording.responseId, responseId)))[0].data.toString()).toBe("disposable-audio");
+    await db.update(schema.response).set({ status: "completed", analysisStatus: "failed", hasRecording: true }).where(eq(schema.response.id, responseId));
+    const { getReviewInbox, queueInboxAnalysis } = await import("@/lib/review-inbox");
+    const inbox = await getReviewInbox(userId, { interviewId, category: "failed", from: new Date().toISOString().slice(0, 10) });
+    expect(inbox.rows.map((r) => r.id)).toEqual([responseId]);
+    expect(inbox.counts.failed).toBe(1);
+    expect((await getReviewInbox("unrelated-owner", { interviewId })).rows).toEqual([]);
+    await queueInboxAnalysis(userId, responseId);
+    expect((await getReviewInbox(userId, { interviewId })).counts).toMatchObject({ failed: 0, processing: 1 });
+    await expect(queueInboxAnalysis(userId, responseId)).rejects.toThrow("Only failed or stalled");
   });
 });

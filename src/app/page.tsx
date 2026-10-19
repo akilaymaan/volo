@@ -106,7 +106,7 @@ export default async function Home() {
         <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
           <div className="grid gap-x-16 gap-y-10 md:grid-cols-2">
             {FEATURES.map((f) => (
-              <div key={f.title} className="border-l-2 border-signal pl-5">
+              <div key={f.title} className="border-l-2 border-border pl-5">
                 <h3 className="text-xl font-semibold">{f.title}</h3>
                 <p className="mt-2 text-muted-foreground">{f.body}</p>
               </div>

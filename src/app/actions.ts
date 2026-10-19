@@ -26,6 +26,7 @@ import { takeRateLimit } from "@/lib/rate-limit";
 import { deleteTemplate, saveTemplate } from "@/lib/templates";
 import { previewInvitationImport } from "@/lib/bulk-invitations";
 import { bulkReviewCandidates } from "@/lib/bulk-review";
+import { queueInboxAnalysis } from "@/lib/review-inbox";
 import { MAX_IMPORT_BYTES, type ImportMode, type ImportRecipient } from "@/lib/invitation-import";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -189,11 +190,13 @@ export async function saveInterviewAction(
     if (id) {
       await getOwnedInterview(id, user.id);
       await db.update(interview).set({ ...values, insights: [], insightsUpdatedAt: null }).where(eq(interview.id, id));
+      revalidatePath("/dashboard/inbox");
       revalidatePath(`/dashboard/interviews/${id}`);
       return { ok: true, id };
     }
     const newId = nanoid(12);
     await db.insert(interview).values({ ...values, id: newId, ownerId: user.id });
+    revalidatePath("/dashboard/inbox");
     revalidatePath("/dashboard");
     return { ok: true, id: newId };
   } catch (e) {
@@ -218,6 +221,7 @@ export async function deleteInterviewAction(id: string): Promise<Result> {
     const user = await requireUser();
     await getOwnedInterview(id, user.id);
     await db.delete(interview).where(eq(interview.id, id));
+    revalidatePath("/dashboard/inbox");
     revalidatePath("/dashboard");
     return { ok: true };
   } catch (e) {
@@ -241,10 +245,23 @@ export async function refreshInsightsAction(id: string): Promise<Result> {
 
 // ---------- responses ----------
 
+export async function retryInboxAnalysisAction(responseId: string): Promise<Result> {
+  try {
+    const user = await requireUser();
+    const id = z.string().min(1).max(64).regex(/^[\w-]+$/).parse(responseId);
+    const queued = await queueInboxAnalysis(user.id, id);
+    after(() => runAnalysis(id));
+    revalidatePath(`/dashboard/interviews/${queued.interviewId}`, "layout");
+    revalidatePath("/dashboard/inbox");
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
 export async function bulkReviewCandidatesAction(input: unknown): Promise<Result<{ count: number }>> {
   try {
     const user = await requireUser();
     const result = await bulkReviewCandidates(user.id, input);
+    revalidatePath("/dashboard/inbox");
     revalidatePath(`/dashboard/interviews/${result.interviewId}`, "layout");
     return { ok: true, count: result.count };
   } catch (e) { return fail(e); }
@@ -259,6 +276,7 @@ export async function setCandidateStatusAction(
     const parsed = z.enum(["none", "shortlisted", "maybe", "rejected"]).parse(status);
     const { interview: iv } = await getOwnedResponse(responseId, user.id);
     await db.update(response).set({ candidateStatus: parsed }).where(eq(response.id, responseId));
+    revalidatePath("/dashboard/inbox");
     revalidatePath(`/dashboard/interviews/${iv.id}`, "layout");
     return { ok: true };
   } catch (e) {
@@ -276,6 +294,7 @@ export async function deleteResponseAction(responseId: string): Promise<Result> 
       await tx.update(interview).set({ insights: [], insightsUpdatedAt: null }).where(eq(interview.id, iv.id));
     });
     revalidatePath(`/dashboard/interviews/${iv.id}`);
+    revalidatePath("/dashboard/inbox");
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -307,6 +326,7 @@ export async function reanalyzeAction(responseId: string): Promise<Result> {
       ))).returning({ id: response.id });
     if (!queued.length) throw new PublicError("Analysis is already running.");
     after(() => runAnalysis(responseId));
+    revalidatePath("/dashboard/inbox");
     revalidatePath(`/dashboard/interviews/${iv.id}`, "layout");
     return { ok: true };
   } catch (e) {

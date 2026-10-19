@@ -32,6 +32,8 @@ const nextConfig: NextConfig = {
     } } : {}),
     rules: {
       "*.css": {
+        // CSS Modules must retain Next's built-in scoped class exports.
+        condition: { not: { path: "*.module.css" } },
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },

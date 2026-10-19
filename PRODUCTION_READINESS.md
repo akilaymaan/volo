@@ -449,3 +449,252 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   bundle test-marker scan and desktop/390px-mobile recovery-page visual review.
 - Browser/device-specific Safari/iOS storage and network behavior still needs
   staging validation. No commit, push or deployment was performed.
+
+## Recruiter Review Inbox (2026-10-20)
+
+- Added `/dashboard/inbox` and dashboard/sidebar links. Completed responses are
+  grouped by unopened reports, missing decisions, failed/stalled analysis and
+  missing recordings. Counts overlap; the all-attention count is unique responses.
+- Owner-scoped metadata queries exclude transcripts, analytics, audio and tokens.
+  Loading, refreshing and filtering the inbox never marks reports viewed or starts
+  analysis. Report/interview link prefetch is disabled to avoid destination effects.
+- Interview, decision and inclusive UTC-date filters use validated query parameters.
+  Stable newest-first pagination shows 25 rows per page, capped at page 1,000.
+- Failed/stalled completed analyses can be explicitly retried after a cost-warning
+  confirmation. Authentication, ownership, the shared analysis rate limit and an
+  atomic state check guard queueing. Fresh pending/running analyses cannot be
+  requeued. Queue acceptance is not reported as successful analysis completion.
+- Missing recording flags distinguish the three-hour recovery window from older
+  missing recordings. Recovery still requires the candidate's original browser
+  and existing permission; the inbox cannot recover audio from another device.
+- PASS: 144 unit/integration tests and all 27 isolated-build Chromium tests,
+  including account isolation, read-only navigation, filters, retry confirmation,
+  queue failure handling and existing recording recovery flows.
+- PASS: production build, TypeScript, lint, whitespace checks, production bundle
+  test-marker scan and desktop/390px-mobile inbox and confirmation visual review.
+- Four real-PostgreSQL tests remain skipped locally. The optional loopback-only
+  PostgreSQL deployment suite now also exercises inbox queries and retry queueing.
+- No migration, new dependency, live Neon change, paid-provider request, live email,
+  commit, push or deployment was performed. Live-provider/staging checks remain
+  separate from the isolated local verification.
+
+## Reference Dashboard UI Integration (2026-10-20)
+
+- Recreated the supplied desktop composition with a black collapsible sidebar,
+  connected nested navigation, gradient workspace avatar, white content panel,
+  compact Geist typography, quick actions, account menu and thin bordered cards.
+  Existing routes, authentication, candidate flow and review features are retained.
+- Added read-only, owner-scoped monthly completed-interview counts and mutually
+  exclusive human-decision distribution. Summary metrics show average completed
+  duration, completion rate, successfully analyzed average score and active roles.
+  Empty data stays empty; unavailable averages use a dash, never sample figures.
+- Inclusive UTC response-date filters default to twelve calendar months through
+  today and accept bounded custom ranges. Literal interview-name and live/paused
+  filters apply to aggregates and listings. Listing response totals remain all-time.
+  Invalid/repeated filter parameters are rejected without broadening the query.
+- Quick actions search existing pages and owned interview names with Ctrl/Cmd+K.
+  Chart menus offer an accessible data table and CSV export. Account sign-out,
+  theme switching, workspace navigation, sidebar collapse and mobile menus work.
+  Navigation avoids prefetch-triggered report/reanalysis side effects.
+- Kept styles scoped to the dashboard; public/candidate screens retain their theme.
+  Corrected the existing Turbopack Tailwind rule to exclude CSS Modules, preserving
+  Next's scoped class exports. No dependency or schema migration was added.
+- PASS: 150 unit/integration tests; four optional real-PostgreSQL tests skipped
+  locally. Tests exercise UTC boundaries, partial/empty months, ownership, literal
+  search escaping, statuses, valid-score aggregation and read-only behavior.
+- Desktop geometry is browser-asserted at 1600x1200: 191px sidebar and chart at
+  (291,259), 358px tall. Desktop, dark-mode and 390px mobile screenshots were visually
+  compared/refined; actual chart values intentionally differ from reference data.
+- PASS: all 29 isolated-build Chromium tests, including dashboard search/filtering,
+  chart table/CSV, theme and sidebar controls, mobile navigation, account sign-out
+  and existing interview, recording recovery, report, template and inbox flows.
+  Production build, TypeScript, lint, whitespace and production test-marker scans
+  also pass. Browser checks use a disposable local database, not production Neon.
+- No live Neon data changes, paid-provider calls, live email, commit, push or deploy.
+
+## Edge-to-edge Shared Reference Theme (2026-10-20)
+
+- Removed the reference image's presentation frame: no gray outer canvas, viewport
+  padding, outer rounded shell or inner black frame. The black sidebar starts at
+  the viewport's top-left; the main panel reaches the right edge. Normal document
+  scrolling replaces the constrained, scrollbar-hidden inner panel.
+- Moved the neutral palette and Geist typography to the root theme, including
+  portaled dropdowns, dialogs, notifications, forms, authentication and candidate
+  screens. Removed hard-coded teal auth/editor surfaces and candidate action colors.
+  Saved interview/persona branding and meaningful chart/status colors are preserved.
+- Light mode is the default under the new `volo-reference-theme` preference key,
+  so legacy system/teal dark-mode preferences no longer override the reference.
+  Explicit dark-mode selection remains available and uses neutral gray surfaces.
+- Standardized shared corner radii and compact dashboard headings. Tests assert
+  sidebar bounds (0,0,191,1200), chart origin (215,129), full-width content and actual
+  light/dark menu colors, rather than matching minified CSS spelling.
+- New interview branding defaults to black; existing saved branding and all prior
+  optional color choices remain intact. The editor preview is browser-asserted black.
+- PASS: 150 unit/integration tests, all 30 isolated-build Chromium tests, production
+  build, TypeScript, lint, whitespace and production test-marker checks. Four
+  optional real-PostgreSQL tests were skipped locally. Cross-page screenshots cover
+  inbox, interviewers, templates, usage, editor, interview and report screens.
+- Local development remains available on port 3000. No migration, live Neon data
+  change, paid-provider request, commit, push or deployment was performed.
+
+## Dashboard Branding and Interaction Responsiveness (2026-10-20)
+
+- Added the existing Volo logo and wordmark to the desktop sidebar's top-left and
+  mobile header/drawer; collapsed navigation retains an accessible icon-only logo.
+  Explicit black mobile-header styling keeps the white wordmark readable.
+- Added short button press/color transitions, sidebar collapse transitions and
+  immediate navigation pending feedback. Reduced-motion preferences disable motion.
+  No artificial waits, optimistic paid operations or fabricated success were added.
+- Read-only dashboard destinations preload on hover/focus under an explicit
+  allowlist. Reports, finalizing interview pages, exports and query-driven editors
+  are excluded. Four safe route loading boundaries and a keyed home-page Suspense
+  fallback preserve an interactive shell while content loads. Dynamic detail pages
+  retain their authorization/not-found checks before streaming.
+- Interview-name lookup no longer blocks the dashboard shell; quick-action search
+  streams those results independently with loading/error feedback. Authentication
+  checks are deduplicated with React cache within a render, never cached globally.
+- Dashboard/inbox GET filters use Next Form for client-side navigation and pending
+  submit feedback, retaining native validation and no-JavaScript form behavior.
+  Stretched interview-row click targets and explicit confirmation/rate-limit guards
+  remain intact. Network/database/provider completion is not guaranteed instant.
+- PASS: 152 unit/integration tests and all 31 isolated-build Chromium tests;
+  four optional real-PostgreSQL tests skipped locally. New tests verify the safe
+  preload allowlist, top-left/collapsed/mobile branding, visible click feedback and
+  working menus with a deliberately blocked navigation response, reduced motion,
+  same-document filter submission and readable black mobile-header contrast.
+- PASS: production build, TypeScript, lint, whitespace/test-marker checks and
+  desktop/mobile visual review. Existing report-view flags, account isolation,
+  dynamic-detail 404 checks, guarded retries and recording recovery still pass.
+- Local dev remains on port 3000. No migration, production Neon data changes,
+  live provider/email checks, commit, push or deployment were performed.
+
+## Sidebar Account Controls (2026-10-20)
+
+- Replaced the bottom-left workspace selector with the authenticated user's name,
+  email and initials avatar. Its upward-opening menu retains dark-mode switching,
+  usage/privacy navigation and guarded sign-out. Removed the top-right account
+  dropdown and all workspace-specific UI; the header retains Quick actions only.
+- The collapsed sidebar exposes the same menu through its initials avatar. Mobile
+  navigation includes the same account controls at the bottom of the drawer.
+  Sign-out failures show a safe error toast and restore the ability to retry.
+- PASS: 152 unit/integration tests and all 32 isolated-build Chromium tests,
+  production build, TypeScript, lint and whitespace checks. Four optional real-
+  PostgreSQL tests skipped locally. New browser assertions cover footer bounds,
+  removal of the header/workspace controls, upward positioning, collapsed access
+  and mobile theme switching; real local sign-out remains covered end-to-end.
+- Desktop/mobile menu screenshots were visually reviewed. No schema migration,
+  live Neon changes, live provider/email checks, commit, push or deployment.
+
+## Dashboard Navigation Latency (2026-10-20)
+
+- Changed the safe-route allowlist to fully preload visible links in production,
+  rather than waiting for hover/focus. Unsafe report/detail/export/query-driven
+  editor destinations remain excluded. No global authentication/data cache added.
+- Usage totals, recent activity and retention counts run concurrently. Retention
+  dry runs now use one aggregate query instead of two sequential identity loads;
+  owner scope, null dates and per-interview retention boundaries are tested.
+  Explicit deletion and its transaction remain unchanged.
+- Read-only real Neon connection benchmark: initial connection/select 3453 ms;
+  subsequent selects 302–313 ms. This latency can still affect initial visits.
+- Added `npm run preview`: an optimized real-provider build/server in isolated
+  `.next-preview`, no migrations, with optional PORT. Stopped the verified project
+  development server and started this preview at http://localhost:3000. Development
+  mode remains available, but lacks production link preloading and compiles on demand.
+- PASS: 154 unit/integration tests, 33 Chromium tests, optimized production build,
+  TypeScript, lint and whitespace checks.
+  Four optional loopback PostgreSQL tests skipped. Browser benchmark blocks new
+  target requests after preloading and asserts actual content, not a loader:
+  Templates 143 ms, Interviewers 165 ms, Usage/privacy 170 ms; zero extra requests.
+  These timings use the isolated test database, not live authenticated Neon data.
+- Real-provider preview sign-in returned HTTP 200; unauthenticated dashboard
+  correctly returned HTTP 307. Production JS contains no test-provider markers.
+- No schema migration, live Neon writes, live AI/email checks, commit, push or
+  deployment. Preview does not hot-reload; restart its build after source changes.
+
+## Interactive Authentication Sphere (2026-10-20)
+
+- Replaced only the authentication-page gray blob with a silver/glass sphere,
+  fine SVG contours, a restrained orbit and slowly rotating reflections. Shared
+  interview/persona VoiceOrb audio behavior is unchanged; no dependencies added.
+- Mouse movement shifts the sphere by at most 12/10 pixels and moves the lighting,
+  without React re-renders. Pointer leave/cancel restores its neutral position.
+  Touch input is ignored. The decoration is hidden from assistive technology and
+  is not focusable or clickable; sign-in/sign-up forms are unchanged.
+- Honors live reduced-motion preference changes. Ambient CSS animation pauses
+  when the component is offscreen or the document is hidden, and stays inactive
+  on small screens where the auth artwork is hidden. Observers/listeners clean up.
+- New browser checks cover cursor tracking/reset, form availability, both auth
+  routes, mobile overflow/hidden artwork, live reduced-motion and touch behavior.
+  All 35 Chromium tests pass. Desktop/mobile screenshots visually reviewed.
+  Production build, TypeScript,
+  lint and whitespace checks pass. Optimized localhost preview rebuilt; sign-in
+  returns HTTP 200. No migration, live provider calls, commit or push.
+
+## Admin-only Usage and Separate Recruiter Privacy (2026-10-20)
+
+- Moved usage to `/dashboard/admin/usage`, aggregating recorded activity across
+  accounts for platform administrators only. The server-side data-access function
+  authenticates and authorizes before querying the ledger. Recent activity is
+  explicitly projected and limited to 100 rows; no candidate response IDs returned.
+- Added server-only `ADMIN_USER_IDS`, a comma-separated exact account-ID allowlist.
+  Empty/unset denies everyone. No email matching, signup promotion, client-supplied
+  role, global auth/usage cache or database migration. Configure IDs on the server
+  and restart/redeploy. Account IDs are visible to their owner on the privacy page.
+- Normal recruiter navigation, account menu and Quick actions show only Privacy
+  and data retention, never API usage. Admin links are conditional and not
+  prefetched. Provider setup diagnostics in the shared shell are admin-only.
+- `/dashboard/privacy` retains account-scoped aggregate expiry previews,
+  retention guidance and explicitly confirmed cleanup through the existing scoped
+  server action. Privacy remains safely preloadable. No usage query on this page.
+- The old `/dashboard/usage` route is also guarded: non-admin document requests
+  return 404; admins redirect to the new page. Removed its streaming loader so
+  document denial occurs before streaming. RSC and metadata-only prefetch responses
+  are checked for absence of ledger data (Next may return a protocol 200).
+- PASS: 159 unit/integration tests; four optional loopback PostgreSQL tests skipped.
+  Coverage includes default denial, exact IDs, anonymous/recruiter denial before
+  any ledger query, permission revocation, all-account totals, unpriced activity
+  and bounded recent rows. Existing owner-scoped deletion/cascade tests still pass.
+- Added disposable-database browser fixtures for a real password-authenticated
+  admin and cross-account ledger rows. Fixture seeding is guarded to E2E builds
+  with an isolated `.data/e2e-<UUID>` PGlite directory and no PostgreSQL URL;
+  neither build/start nor deployment runs it. Production bundles contain none of
+  the fixture usage markers.
+- PASS: all 37 Chromium tests, including admin/recruiter navigation, normal and
+  RSC/prefetch access checks, legacy-route protection, sign-out, privacy cleanup
+  confirmation/cancellation and mobile recruiter navigation. Screenshots of the
+  recruiter privacy and admin usage pages visually reviewed. Privacy preloading
+  still delivers full content without an extra click-time request.
+- Optimized real-provider preview rebuilt on localhost:3000; sign-in HTTP 200.
+  Production build, TypeScript and lint pass. No production admin was selected
+  automatically, no live Neon writes or provider calls, migration, commit or push.
+
+## Neutral Candidate Interview Flow (2026-10-20)
+
+- Removed stored interview theme-color overrides from the candidate top strip
+  and Start button. Candidate controls now use shared neutral tokens; existing
+  teal/custom saved values no longer leak into candidate UI. Saved branding data
+  is preserved and company logos still render. No migration or live data rewrite.
+- Candidate audio orbs use a shared silver color, independent of persona colors.
+  Microphone meters, elapsed progress, consent checkbox, completion indicator and
+  feedback-selection rings are explicitly grayscale. Warning/error colors remain
+  semantic. Speech, consent, transcript, interview and upload behavior unchanged.
+- Added a shared dark candidate shell for setup/live/completion, closed/invalid
+  links and standalone recording recovery. Recovery buttons now have explicit
+  neutral surfaces, hover and keyboard-focus styling.
+- Editor candidate preview matches the actual dark surface and white/gray CTA.
+  Removed the obsolete brand-color picker rather than presenting a control that
+  no longer changes candidate appearance. Existing hidden legacy values remain
+  compatible with saves, templates and duplication; persona editor colors remain.
+- Added isolated legacy-teal and closed-link E2E fixtures. Browser checks cover
+  disabled/enabled Start colors, checkbox accent, silver SVG stops, desktop/mobile
+  layout, microphone consent, live call controls, portaled transcript/end dialogs,
+  cancellation, completion/feedback and recovery under light/dark app preferences.
+- PASS: 159 unit/integration tests; four optional loopback PostgreSQL tests skipped.
+  Desktop/mobile setup, live-call and completion screenshots visually reviewed.
+  Optimized production build, TypeScript, lint and whitespace checks pass.
+  Localhost preview rebuilt; recording recovery returns HTTP 200. Production
+  bundles contain no candidate fixtures/test-provider markers. No live Neon
+  writes, live provider checks, migration, commit or push.
+- PASS: all 39 Chromium tests, including the legacy-teal full candidate flow,
+  unavailable links/recovery, neutral editor preview, recording retry/idempotency,
+  consent/intake and admin/recruiter isolation regressions.

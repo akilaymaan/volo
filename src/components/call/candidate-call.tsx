@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Link from "next/link";
+import { CandidateShell as Shell } from "@/components/call/candidate-shell";
+import { CANDIDATE_ORB_COLOR } from "@/lib/candidate-appearance";
 import { RecordingRecoveryNotice, RecordingUploadCard } from "@/components/call/recording-recovery";
 import { RECOVERY_WINDOW_MS, saveRecordingDraft, type RecordingDraft } from "@/lib/recording-recovery-store";
 import {
@@ -39,10 +40,9 @@ export type PublicInterview = {
   durationMins: number;
   isAnonymous: boolean;
   retentionDays: number;
-  themeColor: string;
   logoUrl: string | null;
   languageLabel: string;
-  interviewer: { name: string; color: string };
+  interviewer: { name: string };
 };
 
 type Line = { role: "agent" | "user"; text: string };
@@ -70,19 +70,6 @@ async function postTurn(form: FormData): Promise<TurnReply> {
     }
     await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
   }
-}
-
-function Shell({ interview, children, recoveryLink = true }: { interview: PublicInterview; children: React.ReactNode; recoveryLink?: boolean }) {
-  return (
-    <div className="dark flex min-h-dvh flex-col bg-background text-foreground">
-      <div className="h-1" style={{ background: interview.themeColor }} />
-      {children}
-      <p className="pb-4 text-center text-xs text-muted-foreground">
-        Powered by <span className="font-heading font-semibold">Volo</span>
-        {recoveryLink && <Link href="/recording-recovery" className="ml-3 underline">Recording recovery</Link>}
-      </p>
-    </div>
-  );
 }
 
 export function CandidateCall({ interview }: { interview: PublicInterview }) {
@@ -366,18 +353,18 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
   }, [phase, recovery, recordingMessage]);
 
   // ---------- render ----------
-  if (phase === "ended") return <Ended interview={interview} responseId={startedId} name={name} recovery={recovery} recordingMessage={recordingMessage} onRecordingRemoved={recordingRemoved} />;
+  if (phase === "ended") return <Ended responseId={startedId} name={name} recovery={recovery} recordingMessage={recordingMessage} onRecordingRemoved={recordingRemoved} />;
 
   if (phase === "intro" || phase === "connecting") {
     const formValid = interview.isAnonymous || (name.trim() && /^\S+@\S+\.\S+$/.test(email));
     return (
-      <Shell interview={interview} recoveryLink={phase === "intro"}>
+      <Shell recoveryLink={phase === "intro"}>
         <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center px-4 py-10">
           {interview.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={interview.logoUrl} alt="Company logo" className="mb-6 h-10 max-w-44 object-contain" />
           )}
-          <VoiceOrb color={interview.interviewer.color} size={132} />
+          <VoiceOrb color={CANDIDATE_ORB_COLOR} size={132} />
           <h1 className="mt-2 text-center text-3xl font-bold">{interview.name}</h1>
           <p className="mt-1 text-center text-muted-foreground">
             A voice conversation with {interview.interviewer.name}, your AI interviewer
@@ -387,13 +374,13 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
 
           <ul className="mt-6 grid w-full gap-3 rounded-2xl bg-card p-4 text-sm sm:grid-cols-2">
             <li className="flex items-center gap-2">
-              <ClockIcon className="size-4 text-mint" /> About {interview.durationMins} minutes
+              <ClockIcon className="size-4 shrink-0 text-muted-foreground" /> About {interview.durationMins} minutes
             </li>
             <li className="flex items-center gap-2">
-              <LanguagesIcon className="size-4 text-mint" /> In {interview.languageLabel}
+              <LanguagesIcon className="size-4 shrink-0 text-muted-foreground" /> In {interview.languageLabel}
             </li>
             <li className="flex items-center gap-2">
-              <HeadphonesIcon className="size-4 text-mint" /> A quiet room, headphones help
+              <HeadphonesIcon className="size-4 shrink-0 text-muted-foreground" /> A quiet room, headphones help
             </li>
             <li className="flex items-center gap-2">
               <AlertTriangleIcon className="size-4 text-signal" /> Stay on this tab
@@ -431,10 +418,10 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
               {micReady ? (
                 <div>
                   <p className="flex items-center gap-2 text-sm font-medium">
-                    <CheckIcon className="size-4 text-mint" /> Microphone connected. Say something to test it.
+                    <CheckIcon className="size-4 text-foreground" /> Microphone connected. Say something to test it.
                   </p>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                    <span ref={meter} className="block h-full rounded-full bg-mint transition-[width] duration-75" style={{ width: 0 }} />
+                    <span ref={meter} className="block h-full rounded-full bg-foreground transition-[width] duration-75" style={{ width: 0 }} />
                   </div>
                 </div>
               ) : (
@@ -458,7 +445,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
                 type="checkbox"
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
-                className="mt-0.5 size-4 accent-[var(--mint)]"
+                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)] focus-visible:outline-2 focus-visible:outline-offset-4"
               />
               I agree that this conversation is recorded, transcribed and analyzed by AI for the hiring team.
             </label>
@@ -472,8 +459,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
             <button
               type="submit"
               disabled={!formValid || !micReady || !consent || phase === "connecting"}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-semibold text-white transition-opacity disabled:opacity-40"
-              style={{ background: interview.themeColor }}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-4 disabled:opacity-40"
             >
               {phase === "connecting" && <Loader2Icon className="size-5 animate-spin" />}
               Start interview
@@ -498,9 +484,9 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
         : `${interview.interviewer.name} is speaking`;
 
   return (
-    <Shell interview={interview} recoveryLink={false}>
+    <Shell recoveryLink={false}>
       <div className="h-0.5 bg-muted">
-        <div className="h-full bg-mint transition-[width] duration-500" style={{ width: `${Math.min(100, (elapsed / total) * 100)}%` }} />
+        <div className="h-full bg-foreground transition-[width] duration-500" style={{ width: `${Math.min(100, (elapsed / total) * 100)}%` }} />
       </div>
       <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <p className="min-w-0 truncate text-sm font-medium">{interview.name}</p>
@@ -521,7 +507,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 pb-6 text-center">
         <div className={cn("transition-transform duration-500", live === "listening" ? "scale-75" : "scale-100")}>
-          <VoiceOrb color={interview.interviewer.color} size={240} getLevel={agentLevel} active={live !== "listening"} />
+          <VoiceOrb color={CANDIDATE_ORB_COLOR} size={240} getLevel={agentLevel} active={live !== "listening"} />
         </div>
         <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
           {live === "thinking" && <Loader2Icon className="size-3.5 animate-spin" />}
@@ -548,7 +534,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
             type="button"
             disabled={live !== "listening"}
             onClick={() => engine.current?.finishTurn()}
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-mint px-6 font-semibold text-[#06201a] transition-opacity disabled:opacity-30"
+            className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-foreground transition-opacity disabled:opacity-30"
           >
             <CheckIcon className="size-5" /> I&apos;m done answering
           </button>
@@ -629,14 +615,14 @@ function MicMeter({ getLevel, active }: { getLevel: () => number; active: boolea
   }, [getLevel, active]);
   return (
     <span className="relative inline-flex size-12 items-center justify-center" aria-label={active ? "Microphone is listening" : "Microphone paused"}>
-      <span ref={ring} className={cn("absolute inset-0 rounded-full transition-colors", active ? "bg-mint/30" : "bg-muted")} />
-      <MicIcon className={cn("relative size-5", active ? "text-mint" : "text-muted-foreground")} />
+      <span ref={ring} className={cn("absolute inset-0 rounded-full transition-colors", active ? "bg-foreground/20" : "bg-muted")} />
+      <MicIcon className={cn("relative size-5", active ? "text-foreground" : "text-muted-foreground")} />
     </span>
   );
 }
 
-function Ended({ interview, responseId, name, recovery, recordingMessage, onRecordingRemoved }: {
-  interview: PublicInterview; responseId: string; name: string;
+function Ended({ responseId, name, recovery, recordingMessage, onRecordingRemoved }: {
+  responseId: string; name: string;
   recovery: { draft: RecordingDraft; persisted: boolean } | null; recordingMessage: string;
   onRecordingRemoved: (id: string, outcome: "saved" | "discarded" | "expired") => void;
 }) {
@@ -659,10 +645,10 @@ function Ended({ interview, responseId, name, recovery, recordingMessage, onReco
   }
 
   return (
-    <Shell interview={interview}>
+    <Shell>
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 text-center">
-        <span className="flex size-16 items-center justify-center rounded-full bg-mint/20">
-          <CheckIcon className="size-8 text-mint" />
+        <span className="flex size-16 items-center justify-center rounded-full bg-foreground/10">
+          <CheckIcon className="size-8 text-foreground" />
         </span>
         <h1 className="mt-5 text-3xl font-bold">{responseId ? `Thank you${name ? `, ${name.split(" ")[0]}` : ""}!` : "Interview closed"}</h1>
         <p className="mt-2 text-muted-foreground">
@@ -690,7 +676,7 @@ function Ended({ interview, responseId, name, recovery, recordingMessage, onReco
                       onClick={() => setRating(i + 1)}
                       className={cn(
                         "size-11 rounded-full text-2xl transition-transform hover:scale-110",
-                        rating === i + 1 ? "bg-mint/25 ring-2 ring-mint" : "bg-muted",
+                        rating === i + 1 ? "bg-foreground/15 ring-2 ring-foreground" : "bg-muted",
                       )}
                     >
                       {f}
@@ -709,7 +695,7 @@ function Ended({ interview, responseId, name, recovery, recordingMessage, onReco
                   type="button"
                   disabled={!rating || sending}
                   onClick={send}
-                  className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-mint font-semibold text-[#06201a] disabled:opacity-40"
+                  className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground disabled:opacity-40"
                 >
                   {sending && <Loader2Icon className="size-4 animate-spin" />}
                   Send feedback

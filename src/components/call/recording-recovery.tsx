@@ -6,7 +6,7 @@ import { listRecordingDrafts, removeRecordingDraft, type RecordingDraft } from "
 import { RecordingUploadError, uploadRecording } from "@/lib/recording-upload";
 
 type Outcome = "saved" | "discarded" | "expired";
-const actionClass = "rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-40";
+const actionClass = "rounded-lg border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-4 disabled:opacity-40";
 
 export function RecordingUploadCard({ draft, persisted, autoStart = false, onRemoved }: {
   draft: RecordingDraft; persisted: boolean; autoStart?: boolean;

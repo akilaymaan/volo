@@ -4,16 +4,21 @@ Volo runs first-round hiring interviews for you. Paste a job description and Cla
 
 **What you get:**
 
-- **An interview editor.** Write the objective, generate questions from a job description (paste it or attach a PDF), then edit, reorder and set follow-ups. Pick an interviewer persona, a language and a length. Add your logo, brand color and an optional invite list. A live preview shows what candidates will see.
+- **An interview editor.** Write the objective, generate questions from a job description (paste it or attach a PDF), then edit, reorder and set follow-ups. Pick an interviewer persona, a language and a length. Add your logo and an optional invite list. A neutral live preview shows what candidates will see.
 - **A candidate page that just works.** A mic check, a consent step, and an audio-reactive interviewer. Live captions and a transcript drawer. Answers end when the candidate pauses (or presses Space). Tab-switch tracking, a server-side time limit, and one attempt per email.
+- **Consistent candidate styling.** Setup, live calls, completion, unavailable links and recording recovery share a neutral dark surface, white/gray controls and a silver audio-reactive orb. Old saved brand/persona colors do not override the candidate interface. Company logos remain supported; warnings and errors retain their semantic colors.
 - **Reports.** Overall score and hiring recommendation, a communication score, strengths and gaps, verbatim quotes, a summary for each question, the full recording and transcript, and a candidate status (shortlisted, maybe or rejected).
 - **Interview overview.** Completion rate, average score and length, candidate satisfaction, AI insights across all candidates, search and filtering, and CSV export.
+- **Recruiting dashboard.** An edge-to-edge black-sidebar workspace with real monthly interview activity, candidate decision distribution and four summary metrics. Date, interview-name and live/paused filters are shareable URL parameters. Search pages/interviews with Quick actions (Ctrl/Cmd+K), collapse the sidebar, inspect chart data or download its CSV. The shared neutral theme covers forms, dialogs, menus, authentication and candidate screens; light mode is the default, with an explicit dark-mode option. Existing interview management, saved candidate branding and the review inbox remain available.
+- **Recruiter review inbox.** A cross-interview attention queue for unopened reports, candidates needing a decision, failed/stalled analysis and responses without recordings. Filter by interview, review status and UTC start date. Opening the inbox never marks reports viewed or starts AI; confirmed analysis retries are owner-scoped and rate-limited.
 - **Bulk candidate review.** Select up to 100 candidates in an interview and confirm a shared review status: Shortlisted, Maybe, Rejected or Not reviewed. Search/status filter changes clear selection, and the confirmation lists the affected candidates. Ownership, completed responses and expected statuses are checked atomically; missing or changed candidates reject the whole batch. No emails are sent and AI scores are unchanged.
 - **Interviewer personas.** Four built in (Lisa, Bob, Aarav, Meera), or create your own with a Sarvam voice and sliders for empathy, depth, rapport and pace.
 - **Personal templates and duplication.** From an interview's **More actions** menu, save its current settings as a named template or open a duplicate in the editor. Use **Templates** in the sidebar to start a new interview or delete a template. Each copy is independent: candidate emails, invitations, responses, recordings and insights are excluded. Restricted intake stays restricted and needs new invitations. A template survives deletion of its source interview; deleting it keeps existing interviews. If its custom interviewer has been deleted, choose a replacement before saving.
 - **Audio-linked evidence.** New recorded interviews capture turn-level audio positions. Click a transcript timestamp or a question's evidence link to play the relevant segment; the current transcript turn is highlighted during playback. Older recordings remain playable with plain transcript links when timing was not captured.
 - **Recording upload recovery.** Completed recordings are temporarily saved in this browser before uploading. Candidates see progress, bounded retries and explicit server confirmation, and can retry after reconnecting or refreshing through **Recording recovery**. Local copies are removed after confirmation or explicit discard and expire within the existing three-hour session window.
 - Dark mode, mobile layouts, keyboard support, and reduced-motion support.
+- **Sidebar account menu.** Your name and email replace the bottom-left workspace selector. Open the menu for dark mode, privacy/data retention and sign-out; an initials avatar keeps it accessible in the collapsed sidebar, and the mobile navigation drawer includes the same controls. The header contains Quick actions only.
+- **Responsive interactions.** Volo branding stays at the dashboard's top-left, with an icon-only collapsed state and mobile header. Short press/sidebar transitions respect reduced motion. Navigation shows immediate pending feedback, visible safe pages fully preload in production, and dashboard/inbox filters navigate without full-page reloads. Reports and analysis-triggering pages are never prefetched; server/provider operations still require real confirmation and can take time.
 
 ## Quick start (about 2 minutes)
 
@@ -40,6 +45,43 @@ Open <http://localhost:3000> and create an account. The example configuration ex
 
 The app requires real provider credentials. Missing keys produce a setup error;
 there is no demo mode or fake AI/email fallback.
+
+## Recruiter review inbox
+
+Open **Review inbox** in the sidebar or Interviews header, or visit
+`/dashboard/inbox`. It includes completed responses from all your interviews,
+including paused interviews. A response appears if it is unopened, has the
+**Not reviewed** status, has failed/stalled analysis, or has no uploaded recording.
+These categories overlap; the total counts unique attention items, not badge sums.
+Resolved candidates remain available in their original interview pages.
+
+Opening a report clears only its unopened flag; you must set a candidate review
+status yourself to clear **Needs decision**. Merely reading/filtering the inbox
+does not change response data, finalize live calls, queue AI work or send emails.
+Report/interview links disable prefetch so viewing the list cannot invoke those
+pages' existing view/finalization behavior.
+
+Filters apply server-side to owned completed responses. Dates use interview start
+times in UTC, with an inclusive Through date. Counts respect interview, status and
+date filters; selecting an attention type changes the list without narrowing the
+other facet counts. Results use stable newest-first ordering and 25-row pages.
+Links preserve filters; applying/resetting filters returns to page one. Deep browsing
+is bounded at page 1000; narrow interview/date filters to reach older results.
+
+**Retry analysis** appears only for failed or stalled analysis, including queued
+or running work with no timestamp or a timestamp at least five minutes old. Confirm
+the provider-cost warning before queueing a retry. Fresh queued/running work and
+completed analyses cannot be retried from the inbox. The existing per-account
+30-attempt/10-minute analysis limit applies, and an atomic state check rejects
+stale/concurrent attempts. Queue acknowledgement does not mean analysis succeeded;
+the inbox refreshes while matching completed responses have analysis in progress.
+There is also a manual Refresh inbox button. Historical responses without snapshots
+use current interview settings, as with the existing report re-analysis action.
+
+**Without recording** does not prove upload failure: candidates may still upload
+within their three-hour session window. Only their original browser can recover
+a locally saved copy; the recruiter inbox cannot recover it on their behalf.
+This feature needs no email setup, new dependency or database migration.
 
 ## Invitations, reports and privacy
 
@@ -76,13 +118,35 @@ there is no demo mode or fake AI/email fallback.
   objective, language, duration and rubric version must match. Historical responses
   without an interview snapshot cannot be compared.
 - Set retention days in the interview editor (90 by default, new responses only).
-  **Usage and privacy** previews expired records and offers confirmed deletion.
+  **Privacy and data retention** previews expired records and offers confirmed deletion.
   Deleting a response removes its recording, linked survey feedback, invitation,
   attempt claim and cached cohort insights. Usage counts survive without a response
   identifier. Legacy responses are not assigned invented consent or deletion dates.
 
 For scheduled retention, deployment requirements, limitations and verification,
 see [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+
+## Admin API usage and recruiter privacy
+
+Recruiters use **Privacy and data retention** (`/dashboard/privacy`) to preview
+and explicitly delete only their own expired candidate data. No provider usage,
+token counts or cost estimates are included on that page.
+
+Platform-wide usage is at `/dashboard/admin/usage`. It requires an authenticated
+account whose exact ID is listed in the server-only `ADMIN_USER_IDS` environment
+variable. No accounts are admins by default. To enable your account:
+
+1. Sign in and copy **Your account ID** from Privacy and data retention.
+2. Set `ADMIN_USER_IDS=your-account-id` in the server environment (comma-separated
+   for multiple admins). Do not use an email address or a `NEXT_PUBLIC_` variable.
+3. Restart the local server, or redeploy after configuring the production host.
+
+Admin-only API usage then appears in navigation and Quick actions. Non-admins
+receive a 404 on both the admin URL and the old `/dashboard/usage` URL; unauthenticated
+visitors must sign in. Old usage bookmarks redirect only after admin authorization.
+Usage recording continues internally; this is an access-control change, not a
+change to provider billing or candidate-retention permissions. Removing an ID and
+restarting/redeploying revokes access; account deletion/recreation does not inherit it.
 
 ## Troubleshooting invitation email
 
@@ -237,6 +301,7 @@ browser mic ──► voice activity detection (splits answers into clips under 
 ```bash
 npm run db:local     # explicitly initialize/migrate local PGlite (server stopped)
 npm run dev          # app; no migration side effects
+npm run preview      # optimized local build + server on port 3000; real providers, no migrations
 npm test             # unit tests (Vitest)
 npm run build        # production build
 npm run test:e2e:build # isolated .next-e2e build with test-only provider doubles
@@ -245,6 +310,14 @@ npm run typecheck
 npm run db:generate  # after editing src/lib/db/schema.ts
 npm run db           # approved direct PostgreSQL connection only
 ```
+
+For realistic page-switching speed, stop `npm run dev` and use `npm run preview`.
+The preview uses its own `.next-preview` build directory and the configured database;
+it does not enable test providers. Unlike development mode, it precompiles routes
+and enables Next.js link preloading. Re-run it after code changes (no hot reload).
+Use `PORT` to select another port. Initial connection to a sleeping or distant Neon
+database can still take time. Usage-page reads run concurrently, and retention
+counts are aggregated in the database instead of loading expired candidate records.
 
 The end-to-end suite signs up, creates an interview, completes a voice interview as a candidate, reviews the report, exports CSV, generates insights, and checks that other accounts can't see your data.
 

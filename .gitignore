@@ -16,7 +16,10 @@
 # next.js
 /.next/
 /.next-verify/
+/.next-preview/
 /.next-e2e/
+/.next-audit/
+/.codex-remote-attachments/
 /out/
 
 # production

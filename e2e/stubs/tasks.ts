@@ -18,6 +18,7 @@ export async function interviewerTurn(args: { interview: Interview; interviewer:
 }
 
 export async function analyzeTranscript(interview: Interview, transcript: TranscriptTurn[]): Promise<Analytics> {
+  if (interview.name === "Inbox analysis failure") throw new Error("Test-only provider failure");
   const candidates = transcript.map((t, i) => ({ ...t, i })).filter((t) => t.role === "user" && t.text !== "[no response]");
   return groundAssessment({
     overallScore: 78, recommendation: "yes", overallFeedback: "Relevant examples with clear explanations.",

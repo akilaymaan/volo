@@ -32,10 +32,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { VoiceOrb } from "@/components/voice-orb";
 import { VoicePreviewButton } from "@/components/voice-preview";
 import { LANGUAGES } from "@/lib/constants";
+import { CANDIDATE_ORB_COLOR } from "@/lib/candidate-appearance";
 import type { Interviewer } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
-
-const THEME_COLORS = ["#0e6e66", "#6d28d9", "#1d4ed8", "#be123c", "#c2410c", "#0f172a"];
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -67,7 +66,7 @@ export function InterviewEditor({
       durationMins: 10,
       questions: [],
       isAnonymous: false,
-      themeColor: THEME_COLORS[0],
+      themeColor: "#111111",
       logoUrl: "",
       allowedEmails: [],
       invitationOnly: false,
@@ -366,32 +365,7 @@ export function InterviewEditor({
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Brand color</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                {THEME_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={`Use color ${c}`}
-                    aria-pressed={v.themeColor === c}
-                    onClick={() => set("themeColor", c)}
-                    className={cn("size-8 rounded-full ring-offset-2 ring-offset-card", v.themeColor === c && "ring-2 ring-foreground")}
-                    style={{ background: c }}
-                  />
-                ))}
-                <label className="relative size-8 cursor-pointer overflow-hidden rounded-full border" title="Custom color">
-                  <span className="sr-only">Custom color</span>
-                  <input
-                    type="color"
-                    value={v.themeColor}
-                    onChange={(e) => set("themeColor", e.target.value)}
-                    className="absolute -inset-2 size-12 cursor-pointer"
-                  />
-                </label>
-              </div>
-            </div>
+          <div>
             <div className="space-y-2">
               <Label>Company logo</Label>
               <div className="flex items-center gap-3">
@@ -459,24 +433,23 @@ export function InterviewEditor({
 
       <aside className="lg:sticky lg:top-8 lg:self-start">
         <p className="mb-2 text-sm font-medium text-muted-foreground">Candidate preview</p>
-        <div className="overflow-hidden rounded-2xl border bg-[#0b1716] text-[#e6f0ee]">
-          <div className="h-1.5" style={{ background: v.themeColor }} />
+        <div data-candidate-preview="" className="dark overflow-hidden rounded-lg border bg-background text-foreground">
+          <div className="h-1 bg-secondary" />
           <div className="flex flex-col items-center px-5 pb-6 pt-5 text-center">
             {v.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={v.logoUrl} alt="" className="mb-3 h-8 max-w-36 object-contain" />
             )}
-            <VoiceOrb color={persona?.color ?? "#3ddc97"} size={110} />
+            <VoiceOrb color={CANDIDATE_ORB_COLOR} size={110} />
             <p className="font-heading text-lg font-semibold leading-tight">{v.name || "Interview name"}</p>
-            <p className="mt-1 text-xs text-[#8fa6a2]">
+            <p className="mt-1 text-xs text-muted-foreground">
               With {persona?.name ?? "your interviewer"}, about {v.durationMins} min
             </p>
-            <p className="mt-3 line-clamp-5 text-sm text-[#c4d4d1]">
+            <p className="mt-3 line-clamp-5 text-sm text-muted-foreground">
               {v.description || "Your intro for candidates appears here."}
             </p>
             <span
-              className="mt-5 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ background: v.themeColor }}
+              className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               Start interview
             </span>

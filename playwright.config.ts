@@ -21,7 +21,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `npm run db:local && npm start -- --port ${PORT}`,
+    command: `npm run db:local && node e2e/seed-admin.mjs && npm start -- --port ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,
@@ -39,6 +39,7 @@ export default defineConfig({
       EMAIL_FROM: "test@example.test",
       RETENTION_CRON_SECRET: "e2e-maintenance-secret-not-for-production",
       RETENTION_ENABLED: "0",
+      ADMIN_USER_IDS: "e2e-platform-admin",
     },
   },
 });

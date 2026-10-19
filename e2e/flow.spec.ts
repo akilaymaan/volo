@@ -11,6 +11,7 @@ let interviewId = "";
 let reportId = "";
 let templateId = "";
 let templatedInterviewId = "";
+let inboxFailureInterviewId = "";
 let recruiterCookies: Awaited<ReturnType<BrowserContext["cookies"]>> | undefined;
 
 async function signIn(page: Page) {
@@ -68,6 +69,8 @@ test("dashboard requires an account", async ({ page }) => {
   await page.screenshot({ path: "test-results/landing-mobile.png", fullPage: true });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await page.goto("/dashboard/inbox");
   await expect(page).toHaveURL(/\/sign-in$/);
   const res = await page.request.get("/api/interviews/anything/export");
   expect(res.status()).toBe(401);
@@ -466,11 +469,13 @@ test("candidate credentials do not leak through report identifiers", async ({ re
   expect((await request.post("/api/call/start", { data: { interviewId, name: "No Consent", email: "noconsent@example.test" } })).status()).toBe(400);
 });
 
-test("usage and privacy is account scoped and maintenance is guarded", async ({ page, request }) => {
+test("privacy remains accessible without API usage and maintenance is guarded", async ({ page, request }) => {
   await signIn(page);
-  await page.getByRole("link", { name: "Usage and privacy" }).click();
-  await expect(page.getByRole("heading", { name: "Usage and privacy" })).toBeVisible();
-  await expect(page.getByText("No recorded provider usage yet.")).toBeVisible();
+  await page.getByRole("link", { name: "Privacy and data retention" }).click();
+  await expect(page.getByRole("heading", { name: "Privacy and data retention" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete expired data" })).toBeVisible();
+  await expect(page.getByText("Recent usage", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Estimated priced usage (USD)", { exact: true })).toHaveCount(0);
   expect((await request.post("/api/maintenance/retention", { data: { dryRun: true } })).status()).toBe(401);
   expect((await request.post("/api/maintenance/retention", {
     headers: { authorization: "Bearer e2e-maintenance-secret-not-for-production" }, data: { dryRun: false },
@@ -504,6 +509,275 @@ test("recruiter compares evidence-backed reports for the same role", async ({ pa
   await expect(page.getByRole("columnheader", { name: "Asha Tester" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Sam Compare" })).toBeVisible();
   await expect(page.getByText("3 / 5 assessed").first()).toBeVisible();
+});
+
+test("review inbox filters completed candidates without marking reports viewed", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole("link", { name: "Review inbox", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/dashboard\/inbox$/);
+  await expect(page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Review inbox", exact: true })).toHaveAttribute("aria-current", "page");
+  const candidates = page.getByRole("list", { name: "Review inbox candidates" });
+  const sam = candidates.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Sam Compare", exact: true }) });
+  await expect(sam).toContainText("Unopened report");
+  await page.getByRole("button", { name: "Refresh inbox" }).click();
+  await expect(sam).toContainText("Unopened report");
+  await expect(candidates.getByRole("link", { name: "Asha Tester", exact: true })).toHaveCount(0);
+  const filters = page.getByRole("form", { name: "Inbox filters" });
+  await filters.getByLabel("Attention type", { exact: true }).selectOption("unopened");
+  await filters.getByLabel("Interview", { exact: true }).selectOption(interviewId);
+  const today = new Date().toISOString().slice(0, 10);
+  await filters.getByLabel("From (UTC)", { exact: true }).fill(today);
+  await filters.getByLabel("Through (UTC)", { exact: true }).fill(today);
+  await filters.getByRole("button", { name: "Apply filters" }).click();
+  await expect(sam).toBeVisible();
+  await expect(page).toHaveURL(/category=unopened/);
+  await filters.getByLabel("Review status", { exact: true }).selectOption("rejected");
+  await filters.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByRole("heading", { name: "No attention items match these filters", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Reset filters", exact: true }).click();
+  await candidates.getByRole("link", { name: "Sam Compare", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Sam Compare", exact: true })).toBeVisible();
+  await page.goto("/dashboard/inbox?category=unopened");
+  await expect(candidates.getByRole("link", { name: "Sam Compare", exact: true })).toHaveCount(0);
+  await page.goto("/dashboard/inbox?category=decision");
+  await expect(sam).toContainText("Needs decision"); // Viewing is not a hiring decision.
+  await page.goto("/dashboard/inbox?category=recording");
+  await expect(candidates.getByRole("link", { name: "Storage Denied", exact: true })).toBeVisible();
+  await expect(candidates.getByRole("link", { name: "Asha Tester", exact: true })).toHaveCount(0);
+  await page.goto("/dashboard/inbox?from=2026-02-30");
+  await expect(page.getByRole("alert").filter({ hasText: "Invalid inbox filters" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Review inbox candidates" })).toHaveCount(0);
+});
+
+test("inbox shows failed analysis across interviews and retries only after confirmation", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/dashboard/interviews/new");
+  await page.getByLabel("Interview name").fill("Inbox analysis failure");
+  await page.getByLabel("Objective").fill("Check explicit analysis retry behavior.");
+  await page.getByRole("button", { name: "Generate", exact: true }).click();
+  await expect(page.getByLabel("Question 5")).toBeVisible();
+  await page.getByRole("button", { name: "Create interview", exact: true }).click();
+  const share = page.getByRole("dialog", { name: "Share with candidates" });
+  await expect(share).toBeVisible();
+  inboxFailureInterviewId = (await share.getByLabel("Interview link").inputValue()).split("/i/")[1];
+  const begun = await page.request.post("/api/call/start", { data: { interviewId: inboxFailureInterviewId, name: "Inbox Failed", email: "inbox-failed@example.test", consentVersion: CONSENT_VERSION } });
+  expect(begun.status()).toBe(200);
+  const { responseId } = await begun.json();
+  let len = 0;
+  for (let i = 0; i < 4; i++) {
+    const turn = await page.request.post("/api/call/turn", { multipart: { responseId, len: String(len), ...(i ? { chunk: { name: "answer.webm", mimeType: "audio/webm", buffer: Buffer.from("test audio") } } : {}) } });
+    expect(turn.status()).toBe(200); len = (await turn.json()).len;
+  }
+  expect((await page.request.post("/api/call/end", { data: { responseId } })).status()).toBe(200);
+  await page.goto("/dashboard/inbox?category=failed");
+  const candidates = page.getByRole("list", { name: "Review inbox candidates" });
+  const row = candidates.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Inbox Failed", exact: true }) });
+  await expect(row).toContainText("Analysis failed or stalled", { timeout: 30_000 });
+  await expect(row.getByRole("link", { name: "Inbox analysis failure", exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/review-inbox-desktop.png", fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/review-inbox-mobile.png", fullPage: true, animations: "disabled" });
+  let retries = 0;
+  await page.route("**/dashboard/inbox**", async (route) => {
+    if (route.request().method() === "POST" && route.request().headers()["next-action"]) retries++;
+    await route.continue();
+  });
+  await row.getByRole("button", { name: "Retry analysis", exact: true }).click();
+  const confirm = page.getByRole("alertdialog", { name: "Retry this AI analysis?", exact: true });
+  await expect(confirm).toContainText("may incur provider charges");
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(retries).toBe(0);
+  await page.getByRole("button", { name: "Refresh inbox", exact: true }).click();
+  expect(retries).toBe(0);
+  await row.getByRole("button", { name: "Retry analysis", exact: true }).click();
+  await page.screenshot({ path: "test-results/review-inbox-confirmation-mobile.png", fullPage: true, animations: "disabled" });
+  await confirm.getByRole("button", { name: "Confirm analysis retry", exact: true }).click();
+  await expect(page.getByText("Analysis retry queued", { exact: true })).toBeVisible();
+  expect(retries).toBe(1);
+  await expect(row).toContainText("Analysis failed or stalled", { timeout: 30_000 }); // The test-only provider deliberately stays unavailable.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`/dashboard/inbox?interviewId=${interviewId}&category=failed`);
+  await expect(page.getByRole("heading", { name: "No attention items match these filters", exact: true })).toBeVisible();
+});
+
+test("reference dashboard supports real analytics, filters, quick actions and responsive navigation", async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 1600, height: 1200 });
+  await expect(page.getByRole("heading", { name: "Interview activity", exact: true })).toBeVisible();
+  await expect(page.getByRole("meter", { name: "Needs decision", exact: true })).toHaveAttribute("aria-valuenow", /\d+/);
+  await expect(page.getByRole("img", { name: /Monthly completed interviews: [1-9]/ })).toBeVisible();
+  const chart = await page.locator("#activity").boundingBox();
+  expect(chart?.x).toBeCloseTo(215, 0);
+  expect(chart?.y).toBeCloseTo(129, 0);
+  expect(chart?.height).toBe(358);
+  expect(await page.getByRole("complementary", { name: "Sidebar" }).evaluate((node) => getComputedStyle(node).width)).toBe("191px");
+  const sidebar = await page.getByRole("complementary", { name: "Sidebar" }).boundingBox();
+  expect(sidebar).toMatchObject({ x: 0, y: 0, height: 1200 });
+  expect(await page.locator("#main-content").evaluate((node) => Math.round(node.getBoundingClientRect().right))).toBe(1600);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menu")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).not.toBeVisible();
+  await page.screenshot({ path: "test-results/dashboard-reference-desktop.png", fullPage: true });
+  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
+  await page.getByRole("button", { name: "Search quick actions" }).click();
+  await page.getByRole("textbox", { name: "Search pages and interviews" }).fill("Frontend");
+  const actions = page.getByRole("navigation", { name: "Quick action results" });
+  await expect(actions.getByRole("link", { name: "Frontend Engineer screen", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Search pages and interviews" }).fill("not-a-real-page");
+  await expect(page.getByText("No matching pages or interviews.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+k");
+  await expect(page.getByRole("dialog", { name: "Quick actions", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Interview activity options" }).click();
+  await page.getByRole("menuitem", { name: "View data table" }).click();
+  await expect(page.getByRole("table")).toBeVisible();
+  await page.getByRole("button", { name: "Interview activity options" }).click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("menuitem", { name: "Download chart CSV" }).click();
+  expect((await download).suggestedFilename()).toBe("interview-activity.csv");
+  await page.getByRole("button", { name: "Interview activity options" }).click();
+  await page.getByRole("menuitem", { name: "Hide data table" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Sign out", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.getByRole("menuitem", { name: "Sign out", exact: true })).not.toBeVisible();
+  await page.screenshot({ path: "test-results/dashboard-reference-dark.png", fullPage: true });
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await page.getByText("Add filter", { exact: true }).click();
+  await page.getByLabel("Interview name", { exact: true }).fill("Inbox analysis failure");
+  await page.getByLabel("Interview status", { exact: true }).selectOption("live");
+  await page.evaluate(() => { document.documentElement.dataset.navigationProof = "same-document"; });
+  await page.getByRole("button", { name: "Apply filters", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Your interviews" })).not.toContainText("Frontend Engineer screen");
+  await expect(page.getByRole("region", { name: "Your interviews" })).toContainText("Inbox analysis failure");
+  await expect(page.locator("html")).toHaveAttribute("data-navigation-proof", "same-document");
+  await page.locator("details").first().locator("summary").click();
+  await page.getByLabel("From (UTC)", { exact: true }).fill("2000-01-01");
+  await page.getByLabel("Through (UTC)", { exact: true }).fill("2000-02-01");
+  await page.getByRole("button", { name: "Apply dates" }).click();
+  await expect(page.getByRole("img", { name: /Monthly completed interviews: 0 total/ })).toBeVisible();
+  await expect(page).toHaveURL(/q=Inbox\+analysis\+failure/);
+  await page.goto("/dashboard?from=2026-02-30");
+  await expect(page.getByRole("alert").filter({ hasText: "Invalid dashboard filters" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Interview activity" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Reset dashboard filters" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/dashboard-reference-mobile.png", fullPage: true });
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Review inbox", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard\/inbox$/);
+  await expect(page.getByRole("dialog", { name: "Menu", exact: true })).not.toBeVisible();
+});
+
+test("Volo branding and click feedback stay responsive while navigation is stalled", async ({ page }) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  // Install before login: visible safe destinations now preload immediately.
+  await page.route("**/dashboard/templates**", async (route) => { await gate; await route.continue(); });
+  await signIn(page);
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const logo = sidebar.getByRole("link", { name: "Volo home", exact: true });
+  await expect(logo).toBeVisible();
+  await expect(logo).toContainText("Volo");
+  const bounds = await logo.boundingBox();
+  expect(bounds?.x).toBe(20); expect(bounds?.y).toBe(20);
+  await expect(logo.locator("svg circle")).toHaveCSS("fill", "rgb(255, 255, 255)");
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(logo.locator("svg")).toBeVisible();
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  const templates = page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Templates", exact: true });
+  try {
+    await templates.click();
+    await expect(templates.locator(".navigation-feedback")).toHaveAttribute("data-pending", "true", { timeout: 1000 });
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await expect(page.getByRole("menuitem", { name: "Sign out", exact: true })).toBeVisible({ timeout: 1000 });
+    await page.keyboard.press("Escape");
+  } finally { release(); }
+  await expect(page).toHaveURL(/\/dashboard\/templates$/);
+  await expect(page.getByRole("heading", { name: "Interview templates", exact: true })).toBeVisible();
+  await page.unroute("**/dashboard/templates**");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const duration = await sidebar.evaluate((node) => parseFloat(getComputedStyle(node).transitionDuration));
+  expect(duration).toBeLessThan(.001);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("link", { name: "Volo home", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Volo home", exact: true }).locator("..")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/volo-brand-mobile.png" });
+});
+
+test("visible navigation preloads full page content before clicking, without a server round trip", async ({ page }) => {
+  const destinations = [
+    { path: "/dashboard/templates", link: "Templates", content: "Interview templates", role: "heading" as const },
+    { path: "/dashboard/interviewers", link: "Interviewers", content: "New interviewer", role: "button" as const },
+    { path: "/dashboard/privacy", link: "Privacy and data retention", content: "Expired candidate data", role: "heading" as const },
+  ];
+  const prefetched = Promise.all(destinations.map(({ path }) => page.waitForResponse((res) => new URL(res.url()).pathname === path && res.request().method() === "GET")));
+  await signIn(page);
+  for (const response of await prefetched) {
+    expect(response.status()).toBe(200);
+    await response.finished();
+  }
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  for (const destination of destinations) {
+    let unexpectedRequests = 0;
+    const pattern = `**${destination.path}**`;
+    await page.route(pattern, async (route) => { unexpectedRequests++; await route.abort(); });
+    const start = Date.now();
+    await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: destination.link, exact: true }).click();
+    await expect(page.getByRole(destination.role, { name: destination.content, exact: true })).toBeVisible({ timeout: 1000 });
+    const elapsed = Date.now() - start;
+    console.log(`[navigation benchmark] Preloaded ${destination.link} content visible in ${elapsed}ms, additional requests: ${unexpectedRequests}`);
+    expect(unexpectedRequests).toBe(0);
+    await expect(page.getByRole("status", { name: "Loading dashboard content" })).toHaveCount(0);
+    await page.unroute(pattern);
+  }
+});
+
+test("account controls replace the workspace at bottom-left on desktop, collapsed and mobile layouts", async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const account = sidebar.getByRole("button", { name: "Account menu", exact: true });
+  await expect(account).toContainText(TEST_USER.name);
+  await expect(page.locator("#main-content > header").getByRole("button", { name: "Account menu" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Workspace menu" })).toHaveCount(0);
+  const bounds = await account.boundingBox();
+  expect(bounds?.x).toBe(20); expect(bounds?.y).toBeGreaterThan(780);
+  await account.click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toContainText(TEST_USER.email);
+  await expect(menu.getByRole("menuitem", { name: "Sign out", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Toggle dark mode", exact: true })).toBeVisible();
+  expect((await menu.boundingBox())!.y).toBeLessThan(bounds!.y);
+  await page.screenshot({ path: "test-results/sidebar-account-desktop.png" });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await account.click();
+  await expect(page.getByRole("menuitem", { name: "Sign out", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "Account menu" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Sign out", exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/sidebar-account-mobile.png" });
+  await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test("recruiter confirms bulk review and selection never includes hidden results", async ({ page }) => {
@@ -677,6 +951,12 @@ test("other accounts can't see this interview or reuse its templates", async ({ 
   expect((await page.goto(`/dashboard/interviews/new?template=${templateId}`))?.status()).toBe(404);
   await page.goto("/dashboard/templates");
   await expect(page.getByRole("heading", { name: "No templates yet" })).toBeVisible();
+  await page.goto(`/dashboard/inbox?interviewId=${inboxFailureInterviewId}`);
+  await expect(page.getByRole("heading", { name: "No attention items match these filters", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Inbox analysis failure", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Inbox Failed", { exact: true })).toHaveCount(0);
+  await page.goto("/dashboard/inbox");
+  await expect(page.getByRole("heading", { name: "No attention items match these filters", exact: true })).toBeVisible();
   await ctx.close();
 });
 
@@ -693,4 +973,47 @@ test("deleting a template keeps interviews created from it", async ({ page }) =>
   expect((await page.goto(`/dashboard/interviews/new?template=${templateId}`))?.status()).toBe(404);
   await page.goto(`/dashboard/interviews/${templatedInterviewId}`);
   await expect(page.getByRole("heading", { name: "Template-based engineer screen", exact: true })).toBeVisible();
+});
+
+test("all recruiter screens share the edge-to-edge neutral reference theme", async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const [name, path] of [
+    ["inbox", "/dashboard/inbox"], ["interviewers", "/dashboard/interviewers"],
+    ["templates", "/dashboard/templates"], ["privacy", "/dashboard/privacy"],
+    ["editor", "/dashboard/interviews/new"], ["interview", `/dashboard/interviews/${interviewId}`],
+    ["report", `/dashboard/interviews/${interviewId}/responses/${reportId}`],
+  ]) {
+    await page.goto(path);
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    expect(await page.locator("body").evaluate((node) => getComputedStyle(node).getPropertyValue("--primary").trim())).toMatch(/^#111(?:111)?$/);
+    expect(await page.getByRole("complementary", { name: "Sidebar" }).evaluate((node) => node.getBoundingClientRect().left)).toBe(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (name === "editor") {
+      const preview = page.locator("[data-candidate-preview]");
+      await expect(preview).toHaveCSS("background-color", "rgb(22, 22, 22)");
+      await expect(preview.getByText("Start interview", { exact: true })).toHaveCSS("background-color", "rgb(238, 238, 238)");
+      await expect(preview.getByText("Start interview", { exact: true })).toHaveCSS("color", "rgb(17, 17, 17)");
+      await expect(page.getByText("Brand color", { exact: true })).toHaveCount(0);
+    }
+    await page.screenshot({ path: `test-results/reference-${name}-desktop.png` });
+  }
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menu")).toHaveCSS("background-color", "rgb(32, 32, 32)");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+});
+
+test("dashboard account menu signs out without leaving authenticated dashboard access", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/sign-in$/);
 });

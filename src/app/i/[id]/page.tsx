@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { CandidateCall } from "@/components/call/candidate-call";
 import { VoiceOrb } from "@/components/voice-orb";
+import { CandidateShell } from "@/components/call/candidate-shell";
+import { CANDIDATE_ORB_COLOR } from "@/lib/candidate-appearance";
 import { languageLabel } from "@/lib/constants";
 import { db } from "@/lib/db";
 import { interview, interviewer } from "@/lib/db/schema";
@@ -23,11 +25,13 @@ export async function generateMetadata(props: PageProps<"/i/[id]">): Promise<Met
 
 function Notice({ title, body }: { title: string; body: string }) {
   return (
-    <main className="dark flex min-h-dvh flex-col items-center justify-center bg-background px-4 text-center text-foreground">
-      <VoiceOrb color="#7aa7a1" size={120} active={false} />
+    <CandidateShell recoveryLink={false}>
+    <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 text-center">
+      <VoiceOrb color={CANDIDATE_ORB_COLOR} size={120} active={false} />
       <h1 className="mt-4 text-2xl font-bold">{title}</h1>
       <p className="mt-2 max-w-sm text-muted-foreground">{body}</p>
     </main>
+    </CandidateShell>
   );
 }
 
@@ -47,10 +51,9 @@ export default async function InterviewLink(props: PageProps<"/i/[id]">) {
         durationMins: iv.durationMins,
         isAnonymous: iv.isAnonymous,
         retentionDays: iv.retentionDays,
-        themeColor: iv.themeColor,
         logoUrl: iv.logoUrl,
         languageLabel: languageLabel(iv.language),
-        interviewer: { name: p.name, color: p.color },
+        interviewer: { name: p.name },
       }}
     />
   );

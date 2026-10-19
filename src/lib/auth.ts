@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { db, schema } from "@/lib/db";
 
 export const auth = betterAuth({
@@ -20,10 +21,11 @@ export const auth = betterAuth({
   plugins: [nextCookies()],
 });
 
-export async function getUser() {
+// Deduplicates layout/page checks within one server render, never across requests/users.
+export const getUser = cache(async () => {
   const s = await auth.api.getSession({ headers: await headers() });
   return s?.user ?? null;
-}
+});
 
 export async function requireUser() {
   const user = await getUser();

@@ -1,0 +1,114 @@
+.scene {
+  position: relative;
+  isolation: isolate;
+  width: min(380px, 100%);
+  height: 340px;
+  flex-shrink: 0;
+  --orb-x: 0px;
+  --orb-y: 0px;
+  --light-x: 36%;
+  --light-y: 27%;
+}
+
+.aura {
+  position: absolute;
+  inset: -35px;
+  background: radial-gradient(ellipse, #ffffff0c 0%, #ffffff05 40%, transparent 68%);
+  pointer-events: none;
+}
+
+.motion {
+  position: absolute;
+  inset: 28px 48px;
+  transform: translate3d(var(--orb-x), var(--orb-y), 0);
+  transition: transform 650ms cubic-bezier(.2,.75,.2,1);
+}
+
+.sphere {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at var(--light-x) var(--light-y), #f8f9fb 0%, #c6c9cf 12%, #6b7079 32%, #272b34 58%, #090b10 79%);
+  box-shadow: inset 2px 2px 7px #ffffff70, inset -9px -12px 22px #000b,
+    0 0 0 1px #ffffff21, 0 14px 65px #ffffff0b;
+}
+
+.flow {
+  position: absolute;
+  inset: -30%;
+  border-radius: 50%;
+  background: conic-gradient(from 20deg, transparent 12%, #e5e7ef30 22%, #fff9 25%, #9297a520 29%,
+    transparent 40%, #020409aa 58%, #d8dce74d 70%, transparent 78%);
+  filter: blur(9px);
+  animation: drift 24s linear infinite;
+}
+
+.contours {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: .16;
+  transform: rotate(-12deg);
+}
+
+.reflection {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at var(--light-x) var(--light-y), #fff7, transparent 40%),
+    radial-gradient(ellipse at 76% 82%, #b1bdde38, transparent 48%);
+  mix-blend-mode: screen;
+}
+
+.rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 2px 1px #fff6, inset -7px -4px 16px #bac5e015;
+}
+
+.orbit {
+  position: absolute;
+  inset: -24px;
+  border: 1px solid #ffffff1f;
+  border-top-color: #ffffff52;
+  border-radius: 50%;
+  transform: rotate(-32deg) scaleY(.36);
+  box-shadow: 0 -1px 10px #ffffff08;
+}
+
+.satellite {
+  position: absolute;
+  top: 38px;
+  right: -4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #edf1ff;
+  box-shadow: 0 0 14px 3px #d6e0ff44;
+}
+
+.shadow {
+  position: absolute;
+  bottom: -3px;
+  left: 25%;
+  width: 50%;
+  height: 15px;
+  border-radius: 50%;
+  background: #ffffff0b;
+  filter: blur(12px);
+  transform: translateX(calc(var(--orb-x) * -.5));
+  transition: transform 650ms ease;
+}
+
+.scene[data-running="false"] .flow { animation-play-state: paused; }
+
+@keyframes drift { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .motion, .shadow { transition: none; transform: none; }
+  .flow { animation: none; }
+}

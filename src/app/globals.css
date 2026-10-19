@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-plex), var(--font-plex-deva), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-bricolage), var(--font-plex-deva), ui-sans-serif, sans-serif;
+  --font-sans: var(--font-dashboard), var(--font-plex-deva), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-dashboard), var(--font-plex-deva), ui-sans-serif, sans-serif;
   --color-signal: var(--signal);
   --color-mint: var(--mint);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -43,85 +43,74 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: 10px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+  --radius-4xl: 12px;
 }
 
-/* Palette: calm interview-room teal, saffron signal accent.
-   ink #10201f · paper #f6f7f5 · teal #0e6e66 · mint #3ddc97 · saffron #f2a93b */
+/* Shared reference palette, including portaled menus, dialogs and notifications.
+   Color is reserved for chart series, warnings/errors and saved interview branding. */
 :root {
-  --background: #f6f7f5;
-  --foreground: #10201f;
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #111111;
   --card: #ffffff;
-  --card-foreground: #10201f;
+  --card-foreground: #111111;
   --popover: #ffffff;
-  --popover-foreground: #10201f;
-  --primary: #0e6e66;
-  --primary-foreground: #f4fffb;
-  --secondary: #e7eeec;
-  --secondary-foreground: #10201f;
-  --muted: #edf1ef;
-  --muted-foreground: #5b6d6a;
-  --accent: #e3f1ec;
-  --accent-foreground: #0b4f49;
-  --destructive: #c2410c;
-  --border: #dde5e2;
-  --input: #d3dcd9;
-  --ring: #0e6e66;
-  --chart-1: #0e6e66;
-  --chart-2: #3ddc97;
-  --chart-3: #f2a93b;
-  --chart-4: #7aa7a1;
-  --chart-5: #c2410c;
-  --signal: #f2a93b;
-  --mint: #3ddc97;
-  --radius: 0.7rem;
-  --sidebar: #eef2f0;
-  --sidebar-foreground: #10201f;
-  --sidebar-primary: #0e6e66;
-  --sidebar-primary-foreground: #f4fffb;
-  --sidebar-accent: #e1ebe8;
-  --sidebar-accent-foreground: #10201f;
-  --sidebar-border: #dde5e2;
-  --sidebar-ring: #0e6e66;
+  --popover-foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f4;
+  --secondary-foreground: #171717;
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+  --accent: #f3f3f3;
+  --accent-foreground: #111111;
+  --destructive: #b91c1c;
+  --border: #e5e5e5;
+  --input: #dedede;
+  --ring: #888888;
+  --chart-1: #7251da;
+  --chart-2: #5284e4;
+  --chart-3: #2ec5e4;
+  --chart-4: #929292;
+  --chart-5: #ed887e;
+  --signal: #a16207;
+  --mint: #525252;
+  --radius: 0.5rem;
+  --sidebar: #000000;
+  --sidebar-foreground: #d4d4d4;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #191919;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #333333;
+  --sidebar-ring: #aaaaaa;
 }
 
 .dark {
-  --background: #0b1716;
-  --foreground: #e6f0ee;
-  --card: #102120;
-  --card-foreground: #e6f0ee;
-  --popover: #122524;
-  --popover-foreground: #e6f0ee;
-  --primary: #3ddc97;
-  --primary-foreground: #06201a;
-  --secondary: #183130;
-  --secondary-foreground: #e6f0ee;
-  --muted: #152b29;
-  --muted-foreground: #8fa6a2;
-  --accent: #173734;
-  --accent-foreground: #c9f5e4;
-  --destructive: #fb923c;
-  --border: #1f3836;
-  --input: #27413f;
-  --ring: #3ddc97;
-  --chart-1: #3ddc97;
-  --chart-2: #2bb3a3;
-  --chart-3: #f2a93b;
-  --chart-4: #7aa7a1;
-  --chart-5: #fb923c;
-  --signal: #f2a93b;
-  --mint: #3ddc97;
-  --sidebar: #0e1d1c;
-  --sidebar-foreground: #e6f0ee;
-  --sidebar-primary: #3ddc97;
-  --sidebar-primary-foreground: #06201a;
-  --sidebar-accent: #173130;
-  --sidebar-accent-foreground: #e6f0ee;
-  --sidebar-border: #1f3836;
-  --sidebar-ring: #3ddc97;
+  color-scheme: dark;
+  --background: #161616;
+  --foreground: #eeeeee;
+  --card: #1b1b1b;
+  --card-foreground: #eeeeee;
+  --popover: #202020;
+  --popover-foreground: #eeeeee;
+  --primary: #eeeeee;
+  --primary-foreground: #111111;
+  --secondary: #272727;
+  --secondary-foreground: #eeeeee;
+  --muted: #242424;
+  --muted-foreground: #aaaaaa;
+  --accent: #292929;
+  --accent-foreground: #ffffff;
+  --destructive: #f87171;
+  --border: #333333;
+  --input: #444444;
+  --ring: #aaaaaa;
+  --signal: #e5b65a;
+  --mint: #d4d4d4;
 }
 
 @layer base {
@@ -131,6 +120,7 @@
   body {
     @apply bg-background text-foreground;
   }
+  input, select, textarea { accent-color: var(--primary); }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
   }
@@ -146,7 +136,20 @@
   }
 }
 
+/* Immediate press feedback, without delaying handlers or server requests. */
+button:not([data-slot="button"]) { transition: background-color 140ms ease-out, color 140ms ease-out, opacity 140ms ease-out, transform 100ms ease-out; }
+button:not([data-slot="button"]):active:not(:disabled) { transform: scale(.98); }
+[data-dashboard-link]:not([data-stretched-link]) { position: relative; }
+.navigation-feedback { position: absolute; inset: auto 0 0; height: 2px; border-radius: 2px; background: currentColor; opacity: 0; pointer-events: none; }
+.navigation-feedback[data-pending] { opacity: .65; animation: navigation-pulse 900ms ease-in-out infinite; }
+@keyframes navigation-pulse { 50% { opacity: .25; } }
+.dashboard-loading { padding: 16px 0; }
+.dashboard-loading-line { width: min(300px, 65%); height: 20px; margin-top: 18px; border-radius: 5px; background: var(--muted); }
+.dashboard-loading-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-top: 18px; }
+.dashboard-loading-card { min-height: 180px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); animation: navigation-pulse 1.2s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled) { transform: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

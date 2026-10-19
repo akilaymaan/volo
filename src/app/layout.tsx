@@ -1,16 +1,11 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Sans_Devanagari } from "next/font/google";
+import { Geist, IBM_Plex_Sans_Devanagari } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
-const bricolage = Bricolage_Grotesque({ variable: "--font-bricolage", subsets: ["latin"] });
-const plex = IBM_Plex_Sans({
-  variable: "--font-plex",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
+const geist = Geist({ variable: "--font-dashboard", subsets: ["latin"] });
 const plexDeva = IBM_Plex_Sans_Devanagari({
   variable: "--font-plex-deva",
   subsets: ["devanagari"],
@@ -28,10 +23,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${bricolage.variable} ${plex.variable} ${plexDeva.variable} h-full antialiased`}
+      className={`${geist.variable} ${plexDeva.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" storageKey="volo-reference-theme" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <TooltipProvider>{children}</TooltipProvider>
           <Toaster position="top-center" />
         </ThemeProvider>
