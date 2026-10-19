@@ -88,7 +88,7 @@ export default async function InterviewPage(props: PageProps<"/dashboard/intervi
       </Link>
       <div className="mb-6 mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          {persona && <PersonaDot color={persona.color} name={persona.name} size={44} />}
+          {persona && <PersonaDot color={persona.color} name={persona.name} size={44} monochrome />}
           <div className="min-w-0">
             <h1 className="text-2xl font-bold sm:text-3xl">{iv.name}</h1>
             <p className="text-sm text-muted-foreground">

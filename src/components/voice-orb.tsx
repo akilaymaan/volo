@@ -81,17 +81,18 @@ export function VoiceOrb({
 }
 
 /** Small static avatar for lists. */
-export function PersonaDot({ color, name, size = 32 }: { color: string; name: string; size?: number }) {
+export function PersonaDot({ color, name, size = 32, monochrome = false }: { color: string; name: string; size?: number; monochrome?: boolean }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-heading font-semibold text-white"
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-heading font-semibold ${monochrome ? "bg-secondary text-secondary-foreground" : "text-white"}`}
       style={{
         width: size,
         height: size,
         fontSize: size * 0.42,
-        background: `radial-gradient(circle at 35% 30%, #ffffffb3, ${color} 45%, ${color})`,
+        ...(!monochrome && { background: `radial-gradient(circle at 35% 30%, #ffffffb3, ${color} 45%, ${color})` }),
       }}
       aria-hidden="true"
+      data-persona-avatar={monochrome ? "monochrome" : "color"}
     >
       {name.replace(/^(Explorer|Empathetic|Technical|HR)\s+/i, "").charAt(0).toUpperCase()}
     </span>

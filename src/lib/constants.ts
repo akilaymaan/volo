@@ -57,15 +57,15 @@ export const CANDIDATE_STATUSES = {
   none: { label: "Not reviewed", className: "bg-muted text-muted-foreground" },
   shortlisted: {
     label: "Shortlisted",
-    className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+    className: "border bg-secondary text-secondary-foreground",
   },
   maybe: { label: "Maybe", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
   rejected: { label: "Rejected", className: "bg-rose-500/15 text-rose-700 dark:text-rose-400" },
 } as const;
 
 export const RECOMMENDATIONS = {
-  strong_yes: { label: "Strong hire", className: "text-emerald-600 dark:text-emerald-400" },
-  yes: { label: "Hire", className: "text-emerald-600 dark:text-emerald-400" },
+  strong_yes: { label: "Strong hire", className: "text-foreground" },
+  yes: { label: "Hire", className: "text-foreground" },
   maybe: { label: "Maybe", className: "text-amber-600 dark:text-amber-400" },
   no: { label: "No hire", className: "text-rose-600 dark:text-rose-400" },
 } as const;

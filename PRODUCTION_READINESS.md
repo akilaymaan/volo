@@ -747,3 +747,27 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   production defaults. A guest creates a real interview; a second guest receives
   404 for it. Entry retry/429 feedback, foreign-origin denial, disabled email signup,
   session reuse, refresh and sign-out confirmation all pass.
+
+## Monochrome Report Styling (2026-10-20)
+
+- Replaced emerald Answered chips, strength markers and positive quote borders
+  with shared neutral tokens. High-score gauges, positive hire recommendations
+  and Shortlisted labels are neutral across report/list/inbox reuse. Labels,
+  numeric scores, rubric values and persisted review decisions are unchanged.
+- Added opt-in monochrome PersonaDot rendering for transcript and interview-summary
+  avatars. Saved teal/purple persona colors are ignored only in these views;
+  saved identities/colors and other persona-editor views are not overwritten.
+- Evidence/timestamp links, native recording controls and active-turn highlighting
+  remain functional. Amber warnings/unanswered states and negative/error colors
+  retain semantic meaning; no authorization, AI or data-write behavior changed.
+- PASS: 167 unit/integration tests; four optional loopback PostgreSQL tests skipped.
+  New unit assertions cover legacy-color suppression, identity preservation,
+  opt-in scope and unchanged score/label semantics. Browser report checks assert
+  light/dark chip/avatar/score/recommendation colors before exercising seeking,
+  evidence playback and mobile layout. Light/dark screenshots visually reviewed.
+- Optimized real-provider localhost preview rebuilt. Production build, TypeScript,
+  lint and whitespace checks pass. No migration, live Neon writes or provider
+  calls, commit, push or deployment performed.
+- PASS: all 43 Chromium regressions, including light/dark report styling,
+  recording/timestamp/evidence playback, legacy and failed recording handling,
+  mobile layouts, comparison, review actions, guest isolation and admin guards.

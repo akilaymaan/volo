@@ -306,6 +306,24 @@ test("recruiter reviews the scored report", async ({ page }) => {
   await expect(page.getByText("AI assessment — human review required.", { exact: false })).toBeVisible();
   await expect(page.getByText("Rubric score: 3 / 4").first()).toBeVisible();
 
+  // Positive report styling and saved persona colors must remain monochrome.
+  const answered = page.getByText("Answered", { exact: true }).first();
+  const avatar = page.locator('[data-persona-avatar="monochrome"]').first();
+  await expect(answered).toHaveCSS("background-color", "rgb(244, 244, 244)");
+  await expect(avatar).toHaveCSS("background-image", "none");
+  await expect(avatar).toHaveCSS("background-color", "rgb(244, 244, 244)");
+  await expect(page.locator('[data-persona-avatar="color"]')).toHaveCount(0);
+  await expect(page.getByText("Hire", { exact: true })).toHaveCSS("color", "rgb(17, 17, 17)");
+  await expect(page.getByRole("img", { name: "Overall: 75 out of 100" }).locator("circle").last()).toHaveCSS("color", "rgb(17, 17, 17)");
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Toggle dark mode", exact: true }).click();
+  await expect(answered).toHaveCSS("background-color", "rgb(39, 39, 39)");
+  await expect(avatar).toHaveCSS("background-color", "rgb(39, 39, 39)");
+  await expect(page.getByText("Hire", { exact: true })).toHaveCSS("color", "rgb(238, 238, 238)");
+  await page.screenshot({ path: "test-results/report-neutral-dark.png", fullPage: true });
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Toggle dark mode", exact: true }).click();
+
   const answerAudio = page.getByRole("button", { name: /^Play transcript turn 2 at/ });
   await expect(answerAudio).toBeEnabled({ timeout: 15_000 });
   const offset = Number(await answerAudio.getAttribute("data-offset-ms"));

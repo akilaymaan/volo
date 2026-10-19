@@ -23,7 +23,7 @@ export const maxDuration = 300;
 export const metadata = { title: "Candidate report" };
 
 const STATUS_CHIP = {
-  answered: { label: "Answered", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  answered: { label: "Answered", className: "border bg-secondary text-secondary-foreground" },
   not_answered: { label: "Not answered", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
   not_asked: { label: "Not asked", className: "bg-muted text-muted-foreground" },
 };
@@ -130,7 +130,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
                   <ul className="space-y-2">
                     {a.strengths.map((s) => (
                       <li key={s} className="flex gap-2">
-                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-500" />
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-foreground" />
                         {s}
                       </li>
                     ))}
@@ -153,7 +153,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
                 {a.quotes.length > 0 && (
                   <div className="mt-5 space-y-4">
                     {a.quotes.map((q) => (
-                      <figure key={q.quote} className={cn("border-l-2 pl-4", q.type === "strength" ? "border-emerald-500" : "border-signal")}>
+                      <figure key={q.quote} className={cn("border-l-2 pl-4", q.type === "strength" ? "border-foreground/40" : "border-signal")}>
                         <blockquote className="flex gap-2 italic">
                           <QuoteIcon className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
                           {q.quote}
@@ -210,7 +210,7 @@ export default async function ResponsePage(props: PageProps<"/dashboard/intervie
                 {r.transcript.map((t, i) => (
                   <TranscriptEntry key={i} index={i}>
                     {t.role === "agent" && persona ? (
-                      <PersonaDot color={persona.color} name={persona.name} size={26} />
+                      <PersonaDot color={persona.color} name={persona.name} size={26} monochrome />
                     ) : (
                       <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
                         {(r.name || "C").charAt(0).toUpperCase()}

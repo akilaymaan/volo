@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 export const scoreTone = (score: number) =>
   score >= 75
-    ? "text-emerald-700 dark:text-emerald-400"
+    ? "text-foreground"
     : score >= 50
       ? "text-amber-700 dark:text-amber-400"
       : "text-rose-700 dark:text-rose-400";
