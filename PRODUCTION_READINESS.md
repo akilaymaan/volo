@@ -712,3 +712,38 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   and light/dark page logos. Production build/TypeScript, lint and whitespace
   checks pass. Optimized localhost preview rebuilt. Not committed or deployed;
   the hosted site requires deployment and cached tabs may need reopening.
+
+## One-click Guest Entry (2026-10-20)
+
+- Default `/sign-in` is a monochrome Enter Volo screen with the interactive silver
+  sphere, responsive typography, explicit pending/error states and a guarded
+  one-click button. No email/password/signup fields are shown by default.
+- Added a Better Auth guest-entry endpoint using its internal user/session adapter
+  and signed session-cookie helper. No password is generated/stored, no email sent,
+  no shared owner bypass, no test data/providers and no schema migration. Internal
+  non-deliverable guest identifiers stay hidden from account controls.
+- Existing authenticated sessions are reused. New browsers receive distinct users
+  and normal owner-scoped workspace permissions. Guest identities cannot be admins,
+  even if their IDs are accidentally allowlisted. Missing/foreign origins denied.
+- Creation limits: 10 per resolved IP/hour, 200 globally/day, using hashed database
+  rate-limit keys. These limits do not cap provider spend. Guest AI calls can use
+  real credentials; keep the preview private or protected at the hosting layer.
+- `GUEST_ENTRY_ENABLED=0` disables entry. `ENABLE_EMAIL_SIGNUP=0` (default) pauses
+  the email signup page/API; enabling it later restores registration. Existing
+  accounts remain accessible through Use an existing account, without signup.
+- Guest sign-out requires confirmation. Entry warns that logout, cookie clearing
+  or expiry loses access, without deleting server data. Automatic guest-to-email
+  account/data migration is not implemented; do not use guests for sensitive data.
+- PASS: 164 unit/integration tests and 43 full Chromium regression tests (with
+  email signup explicitly enabled only in the isolated regression server).
+  Four optional loopback PostgreSQL tests skipped. Unit checks cover origin/feature
+  denial, reuse, limits, server-controlled identities, session failure and admin denial.
+- Production build, TypeScript, lint, whitespace and provider-fixture marker
+  checks pass. Entry desktop/mobile screenshots visually reviewed. Real-provider
+  localhost preview rebuilt: entry HTTP 200 without an email field; signup HTTP
+  307 to entry by default. No migration, live Neon writes/provider checks, commit,
+  push or deployment performed.
+- PASS: two additional targeted browser checks with email signup disabled, matching
+  production defaults. A guest creates a real interview; a second guest receives
+  404 for it. Entry retry/429 feedback, foreign-origin denial, disabled email signup,
+  session reuse, refresh and sign-out confirmation all pass.

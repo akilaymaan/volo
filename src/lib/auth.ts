@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db, schema } from "@/lib/db";
+import { guestEntry } from "@/lib/guest-entry";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -17,8 +18,8 @@ export const auth = betterAuth({
       verification: schema.verification,
     },
   }),
-  emailAndPassword: { enabled: true, minPasswordLength: 8 },
-  plugins: [nextCookies()],
+  emailAndPassword: { enabled: true, minPasswordLength: 8, disableSignUp: process.env.ENABLE_EMAIL_SIGNUP !== "1" },
+  plugins: [guestEntry(), nextCookies()],
 });
 
 // Deduplicates layout/page checks within one server render, never across requests/users.

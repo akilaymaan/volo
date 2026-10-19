@@ -44,7 +44,7 @@ test("recruiter signup cannot grant admin access, including direct URLs and RSC 
 });
 
 test("only an allowlisted admin can see platform usage, with retention separate and access lost on sign-out", async ({ page }) => {
-  await page.goto("/sign-in");
+  await page.goto("/sign-in?method=account");
   await page.getByLabel("Work email").fill("admin@example.test");
   await page.getByLabel("Password").fill("local-admin-pass-123");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

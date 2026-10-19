@@ -15,6 +15,7 @@ test("auth sphere follows the cursor, resets on leave and leaves the form usable
   await page.mouse.move(50, 50);
   await expect(orb).toHaveAttribute("data-tracking", "false");
   await expect(orb).not.toHaveAttribute("style");
+  await page.getByRole("link", { name: "Use an existing account" }).click();
   await page.getByLabel("Work email").fill("person@example.test");
   await page.getByLabel("Password").fill("not-submitted");
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();

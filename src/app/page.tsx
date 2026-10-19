@@ -53,10 +53,10 @@ export default async function Home() {
           ) : (
             <>
               <Button asChild variant="ghost" size="lg">
-                <Link href="/sign-in">Sign in</Link>
+                <Link href="/sign-in?method=account">Existing account</Link>
               </Button>
               <Button asChild size="lg" className="ml-1">
-                <Link href="/sign-up">Get started</Link>
+                <Link href="/sign-in">Enter Volo</Link>
               </Button>
             </>
           )}
@@ -76,7 +76,7 @@ export default async function Home() {
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" className="h-11 px-5 text-base">
-                <Link href={user ? "/dashboard/interviews/new" : "/sign-up"}>Create your first interview</Link>
+                <Link href={user ? "/dashboard/interviews/new" : "/sign-in"}>Create your first interview</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-11 px-5 text-base">
                 <a href="#how-it-works">See how it works</a>

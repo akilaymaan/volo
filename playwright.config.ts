@@ -40,6 +40,7 @@ export default defineConfig({
       RETENTION_CRON_SECRET: "e2e-maintenance-secret-not-for-production",
       RETENTION_ENABLED: "0",
       ADMIN_USER_IDS: "e2e-platform-admin",
+      ENABLE_EMAIL_SIGNUP: process.env.E2E_EMAIL_SIGNUP ?? "1",
     },
   },
 });

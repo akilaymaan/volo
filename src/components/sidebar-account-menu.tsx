@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { useState } from "react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { isGuestUser } from "@/lib/guest-identity";
 import { DashboardLink } from "@/components/dashboard-link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import styles from "@/components/dashboard-shell.module.css";
@@ -15,17 +16,19 @@ export function SidebarAccountMenu({ name, email, compact = false, onNavigate }:
   const { resolvedTheme, setTheme } = useTheme();
   const [signingOut, setSigningOut] = useState(false);
   const displayName = name.trim() || email;
+  const guest = isGuestUser({ email });
+  const identity = guest ? "Browser-session access" : email;
   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => Array.from(part)[0]).join("").toUpperCase();
   return <div className={styles.accountFooter}><DropdownMenu>
     <DropdownMenuTrigger className={styles.accountButton} aria-label="Account menu" title={compact ? displayName : undefined}>
       <span className={styles.accountAvatar} aria-hidden="true">{initials}</span>
       {!compact && <>
-        <span className={styles.accountIdentity}><strong>{displayName}</strong><small>{email}</small></span>
+        <span className={styles.accountIdentity}><strong>{displayName}</strong><small>{identity}</small></span>
         <ChevronsUpDownIcon size={12} className="shrink-0" aria-hidden="true" />
       </>}
     </DropdownMenuTrigger>
     <DropdownMenuContent side="top" align="start" sideOffset={12} className="w-60">
-      <DropdownMenuLabel className="break-words text-xs font-normal">{email}</DropdownMenuLabel>
+      <DropdownMenuLabel className="break-words text-xs font-normal">{identity}</DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem onSelect={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
         <SunIcon className="hidden dark:block" /><MoonIcon className="dark:hidden" />Toggle dark mode
@@ -33,6 +36,7 @@ export function SidebarAccountMenu({ name, email, compact = false, onNavigate }:
       <DropdownMenuItem asChild><DashboardLink href="/dashboard/privacy" onClick={onNavigate}>Privacy and data retention</DashboardLink></DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem disabled={signingOut} onSelect={async () => {
+        if (guest && !window.confirm("Sign out of this guest workspace? You will not be able to return to it without this session. Your server-side data will not be deleted.")) return;
         setSigningOut(true);
         try {
           const result = await authClient.signOut();

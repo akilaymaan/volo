@@ -21,7 +21,7 @@ async function signIn(page: Page) {
     await expect(page).toHaveURL(/\/dashboard$/);
     return;
   }
-  await page.goto("/sign-in");
+  await page.goto("/sign-in?method=account");
   await page.getByLabel("Work email").fill(TEST_USER.email);
   await page.getByLabel("Password").fill(TEST_USER.password);
   await page.getByRole("button", { name: "Sign in" }).click();

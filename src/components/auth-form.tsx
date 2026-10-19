@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+export function AuthForm({ mode, allowSignUp = true }: { mode: "sign-in" | "sign-up"; allowSignUp?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -68,12 +68,12 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         {pending && <Loader2Icon className="animate-spin" />}
         {isSignUp ? "Create account" : "Sign in"}
       </Button>
-      <p className="text-center text-sm text-muted-foreground">
+      {(isSignUp || allowSignUp) && <p className="text-center text-sm text-muted-foreground">
         {isSignUp ? "Already have an account? " : "New to Volo? "}
-        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="font-medium text-foreground underline underline-offset-4">
+        <Link href={isSignUp ? "/sign-in?method=account" : "/sign-up"} className="font-medium text-foreground underline underline-offset-4">
           {isSignUp ? "Sign in" : "Create an account"}
         </Link>
-      </p>
+      </p>}
     </form>
   );
 }

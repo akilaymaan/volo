@@ -22,6 +22,36 @@ Volo runs first-round hiring interviews for you. Paste a job description and Cla
 
 ## Quick start (about 2 minutes)
 
+### One-click preview access
+
+The default entry screen is **Enter Volo**: no email, password or signup form.
+Clicking creates a real, isolated guest user/session with a signed authentication
+cookie. It does not expose any existing recruiter's workspace or grant admin
+access, and it does not enable demo data or mock providers. Internal guest email
+identifiers are non-deliverable and hidden from the account menu; no mail is sent.
+
+Guest workspaces depend on their session cookie. Signing out, clearing cookies or
+session expiry loses access; this does **not** delete their server-side records.
+Do not use guest access for sensitive candidate data. A sign-out confirmation
+warns about this. Use **Use an existing account** for an existing saved workspace.
+
+- `GUEST_ENTRY_ENABLED=1` (default): enables one-click entry. Set `0` to disable
+  guest creation and return to existing-account sign-in.
+- `ENABLE_EMAIL_SIGNUP=0` (default): pauses both the signup page and email signup
+  API. Set `1` and restart/redeploy to re-enable registration later. Existing
+  password accounts can always sign in. Guest data is not automatically moved
+  into a newly registered account; account upgrade/transfer is a future feature.
+- Guest creation is limited to 10 per resolved IP/hour and 200 globally/day,
+  backed by the shared database. These are creation limits, **not AI spending
+  caps**. Guest actions use your real configured provider credits. Keep the
+  preview private or use hosting-level access protection; disable guest entry
+  before a public production launch unless that exposure is intentional.
+
+No schema migration is needed. Guest access uses the existing authentication
+tables; database migrations still never run implicitly during build/start.
+
+### Local setup
+
 Requires Node.js 20.9 or newer.
 
 ```bash
