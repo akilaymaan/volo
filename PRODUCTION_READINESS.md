@@ -698,3 +698,17 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 - PASS: all 39 Chromium tests, including the legacy-teal full candidate flow,
   unavailable links/recovery, neutral editor preview, recording retry/idempotency,
   consent/intake and admin/recruiter isolation regressions.
+
+## Monochrome Volo Logo and Favicon (2026-10-20)
+
+- Replaced the remaining teal circle/off-white waveform in `app/icon.svg` with
+  pure black and white. A thin white edge maintains visibility on dark tabs.
+  Shared page-logo fills/strokes are explicitly black/white in both themes;
+  inverted sidebar/mobile logos stay white with black strokes.
+- Retained Next's root file-based icon metadata and generated cache-version URL,
+  so public/auth/candidate pages inherit the same favicon without duplicate tags.
+- PASS: two targeted Chromium tests verify inherited versioned icon metadata,
+  SVG response, exact black/white source colors, zero colored rendered pixels
+  and light/dark page logos. Production build/TypeScript, lint and whitespace
+  checks pass. Optimized localhost preview rebuilt. Not committed or deployed;
+  the hosted site requires deployment and cached tabs may need reopening.
