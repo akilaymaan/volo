@@ -7,6 +7,7 @@ import { newToken, tokenHash } from "@/lib/security";
 import { REMINDER_WAIT_MS } from "@/lib/invitation-import";
 import { previewInvitationImportAction, sendImportedInvitationAction } from "@/app/actions";
 import { requireUser } from "@/lib/auth";
+import { EmailDeliveryError } from "@/lib/email-config";
 
 vi.mock("@/lib/db", async () => {
   const { PGlite } = await import("@electric-sql/pglite");
@@ -32,6 +33,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  vi.stubEnv("RESEND_API_KEY", "test-key");
+  vi.stubEnv("EMAIL_FROM", "hiring@example.test");
   vi.mocked(sendInvitationMail).mockReset().mockResolvedValue({ id: "mock-provider" });
   vi.mocked(requireUser).mockResolvedValue({ id: "owner" } as Awaited<ReturnType<typeof requireUser>>);
   await db.delete(schema.response);
@@ -147,6 +150,33 @@ it("records individual provider failures safely while other recipients can succe
   expect(states).toEqual(expect.arrayContaining([
     { email: "failed@example.test", status: "failed" }, { email: "ok@example.test", status: "sent" },
   ]));
+});
+
+it("rejects missing configuration without creating invitations or consuming rate limits", async () => {
+  vi.stubEnv("RESEND_API_KEY", "");
+  expect(await sendImportedInvitationAction("role", "new@example.test", "new"))
+    .toMatchObject({ ok: false, error: expect.stringContaining("Set RESEND_API_KEY and EMAIL_FROM") });
+  expect(await db.select().from(schema.invitation)).toEqual([]);
+  expect(await db.select().from(schema.rateLimit)).toEqual([]);
+  expect(sendInvitationMail).not.toHaveBeenCalled();
+});
+
+it("does not rotate an existing personal link when sender configuration is invalid", async () => {
+  await seedInvite();
+  const before = await db.select().from(schema.invitation);
+  vi.stubEnv("EMAIL_FROM", "not-an-address");
+  expect(await sendImportedInvitationAction("role", "asha@example.test", "reminder"))
+    .toMatchObject({ ok: false, error: expect.stringContaining("EMAIL_FROM must be") });
+  expect(await db.select().from(schema.invitation)).toEqual(before);
+  expect(sendInvitationMail).not.toHaveBeenCalled();
+});
+
+it("preserves safe actionable provider diagnostics through invitation actions", async () => {
+  vi.mocked(sendInvitationMail).mockRejectedValueOnce(new EmailDeliveryError("sender_domain", "Verify the EMAIL_FROM domain in Resend.", 403));
+  const result = await sendImportedInvitationAction("role", "new@example.test", "new");
+  expect(result).toEqual({ ok: false, error: "Verify the EMAIL_FROM domain in Resend." });
+  const [saved] = await db.select().from(schema.invitation);
+  expect(saved).toMatchObject({ status: "failed", sendCount: 1, providerId: null });
 });
 
 it("rejects paused/anonymous interviews and untrusted action inputs", async () => {

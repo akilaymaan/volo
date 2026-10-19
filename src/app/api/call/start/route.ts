@@ -53,6 +53,7 @@ export async function POST(req: Request) {
 
   const id = nanoid(24);
   const token = newToken();
+  const recordingExpiresAt = new Date(Date.now() + 3 * 60 * 60_000);
   const [persona] = await db.select({
     id: interviewer.id, name: interviewer.name, description: interviewer.description, voice: interviewer.voice,
     color: interviewer.color, empathy: interviewer.empathy, exploration: interviewer.exploration,
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
       await tx.insert(response).values({
         id, interviewId: iv.id, invitationId, name: iv.isAnonymous ? "" : name, email: iv.isAnonymous ? "" : email,
         sessionHash: tokenHash(token),
-        sessionExpiresAt: new Date(Date.now() + 3 * 60 * 60_000),
+        sessionExpiresAt: recordingExpiresAt,
         consentVersion: CONSENT_VERSION, consentedAt: new Date(),
         deleteAfter: new Date(Date.now() + iv.retentionDays * 86_400_000),
         interviewSnapshot: {
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
     console.error("[call:start] database failure");
     return json({ error: "Could not start your interview. Please try again." }, 503);
   }
-  const res = json({ responseId: id });
+  const res = json({ responseId: id, recordingExpiresAt: recordingExpiresAt.getTime() });
   res.headers.set("set-cookie", sessionCookie(id, token, secureCallCookie(req.url)));
   return res;
 }

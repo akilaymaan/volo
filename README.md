@@ -12,6 +12,7 @@ Volo runs first-round hiring interviews for you. Paste a job description and Cla
 - **Interviewer personas.** Four built in (Lisa, Bob, Aarav, Meera), or create your own with a Sarvam voice and sliders for empathy, depth, rapport and pace.
 - **Personal templates and duplication.** From an interview's **More actions** menu, save its current settings as a named template or open a duplicate in the editor. Use **Templates** in the sidebar to start a new interview or delete a template. Each copy is independent: candidate emails, invitations, responses, recordings and insights are excluded. Restricted intake stays restricted and needs new invitations. A template survives deletion of its source interview; deleting it keeps existing interviews. If its custom interviewer has been deleted, choose a replacement before saving.
 - **Audio-linked evidence.** New recorded interviews capture turn-level audio positions. Click a transcript timestamp or a question's evidence link to play the relevant segment; the current transcript turn is highlighted during playback. Older recordings remain playable with plain transcript links when timing was not captured.
+- **Recording upload recovery.** Completed recordings are temporarily saved in this browser before uploading. Candidates see progress, bounded retries and explicit server confirmation, and can retry after reconnecting or refreshing through **Recording recovery**. Local copies are removed after confirmation or explicit discard and expire within the existing three-hour session window.
 - Dark mode, mobile layouts, keyboard support, and reduced-motion support.
 
 ## Quick start (about 2 minutes)
@@ -83,6 +84,27 @@ there is no demo mode or fake AI/email fallback.
 For scheduled retention, deployment requirements, limitations and verification,
 see [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
 
+## Troubleshooting invitation email
+
+Email invitations use Resend, not the AI provider. In Vercel **Project Settings →
+Environment Variables**, configure `RESEND_API_KEY` and `EMAIL_FROM` for
+**Production**, then redeploy so the new deployment receives the values. For other
+hosts, set the same server-side environment variables and restart/redeploy.
+
+`EMAIL_FROM` must be an email address on a domain you have verified in the same
+Resend account as the API key. A display name is optional. Do not use a personal
+Gmail address as the sender. Resend's test sender is restricted to its account's
+own email address; it cannot deliver production invitations to arbitrary candidates.
+See [Resend's sending restrictions](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
+
+The Invitations tab warns about missing/invalid local email configuration and
+disables sending until corrected. Known setup problems do not create an invitation,
+rotate an existing link or consume a send attempt. Provider rejections distinguish
+key/permission, domain verification, test-sender, quota and rate-limit problems
+without exposing private provider responses. Provider acceptance is still not a
+delivery guarantee. For network failures, check the invitation list and Resend
+email status before retrying; resends wait at least one minute and replace the link.
+
 ## Reviewing recordings
 
 Open a candidate report to use the recording alongside its transcript. Timestamp
@@ -100,6 +122,44 @@ Timing metadata is validated and saved atomically with the first recording
 upload. Subsequent uploads cannot replace the bytes or retime the transcript.
 Missing timings are not reconstructed for historical reports. This feature
 uses the existing transcript JSON storage and requires no database migration.
+
+## Recovering recording uploads
+
+Keep the completion screen open until it says the recording was saved. Upload
+progress reaches 100% only after the server acknowledges the upload. Temporary
+network, rate-limit and server failures get at most two automatic retries per
+attempt. A retry checks server acknowledgement first, so a saved-but-lost reply
+does not resend recording bytes or change existing transcript timing cues.
+
+If interrupted after the completed recording was saved locally, reopen the same
+site in the same browser and choose **Recording recovery** from the candidate-page
+footer, or open `/recording-recovery` directly. A pending-copy notice also appears
+on that interview's intake page. Restored copies require an explicit retry; an
+enabled attempt resumes when the browser reconnects. This also works after the
+interview stops accepting new candidates, while the original session remains valid.
+
+Recovery uses IndexedDB for up to three unexpired recordings of at most 25 MB
+each. Older unexpired copies are never silently evicted. If storage is unavailable,
+blocked or full, the completion screen retains a memory-only copy and warns not to
+refresh or close the tab. Candidates can download a copy or explicitly remove the
+local copy. Downloaded files are not automatically deleted by recovery cleanup.
+
+Only audio, navigation timing, response/interview IDs and bounded upload metadata
+are persisted—no session token, candidate name/email or transcript text. Uploads
+still require the original HttpOnly session cookie, and revoked/deleted sessions
+are rejected. The upload deadline remains three hours from starting the interview;
+expired/invalid local records are purged on recovery access, or at expiry while
+their recovery card is open. Successful uploads remove their local copy. If cleanup
+fails, the UI warns and offers manual removal/site-data cleanup.
+
+This is completed-recording upload recovery, not live-call resume or mid-call
+crash recovery. Closing the tab before local preparation completes can lose the
+recording. Browser eviction, cleared cookies/storage, a different browser/site,
+private browsing and expired permission can prevent recovery. No background worker
+uploads while the page is closed. Host upload limits still apply (including
+Vercel's 4.5 MB request limit); a permanent size rejection offers download rather
+than an endless retry. New candidates acknowledge the updated local-storage
+disclosure; historical consent records are unchanged. No migration is needed.
 
 ## Deploying
 

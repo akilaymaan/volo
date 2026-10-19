@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PersonaDot } from "@/components/voice-orb";
 import { requireUser } from "@/lib/auth";
 import { languageLabel } from "@/lib/constants";
+import { emailConfigurationIssue } from "@/lib/email-config";
 import { analysisState, fmtDuration } from "@/lib/format";
 import {
   finalizeStale,
@@ -138,7 +139,7 @@ export default async function InterviewPage(props: PageProps<"/dashboard/intervi
         </TabsContent>
 
         {!iv.isAnonymous && <TabsContent value="invitations" className="mt-4">
-          <InvitationManager interviewId={iv.id} rows={invites.map((r) => ({
+          <InvitationManager interviewId={iv.id} setupError={emailConfigurationIssue()} rows={invites.map((r) => ({
             id: r.id, email: r.email, status: !r.revokedAt && r.expiresAt < new Date() && !["started", "completed"].includes(r.status) ? "expired" : r.status,
             expiresAt: r.expiresAt.toISOString(), revoked: !!r.revokedAt, sendCount: r.sendCount,
           }))} />

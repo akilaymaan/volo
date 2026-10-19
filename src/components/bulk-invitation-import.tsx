@@ -11,7 +11,7 @@ import { MAX_IMPORT_BYTES, type ImportMode, type ImportRecipient } from "@/lib/i
 type Outcome = { status: "accepted" | "failed" | "unknown"; message: string };
 const STATUS_LABEL = { ready: "Ready", invalid: "Invalid", duplicate: "Duplicate", blocked: "Skipped", accepted: "Accepted", failed: "Failed", unknown: "Unconfirmed" };
 
-export function BulkInvitationImport({ interviewId }: { interviewId: string }) {
+export function BulkInvitationImport({ interviewId, sendingDisabled = false }: { interviewId: string; sendingDisabled?: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<ImportMode>("new");
   const [csv, setCsv] = useState("");
@@ -62,7 +62,7 @@ export function BulkInvitationImport({ interviewId }: { interviewId: string }) {
   }
 
   function send() {
-    if (busy.current || !confirmed || !ready.length) return;
+    if (sendingDisabled || busy.current || !confirmed || !ready.length) return;
     busy.current = true;
     cancelled.current = false;
     setSending(true);
@@ -157,7 +157,7 @@ export function BulkInvitationImport({ interviewId }: { interviewId: string }) {
             I reviewed these recipients and want to send {mode === "new" ? "invitations" : "reminders"}.
           </label>}
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button type="button" disabled={pending || !confirmed || !ready.length} onClick={send}>
+            <Button type="button" disabled={sendingDisabled || pending || !confirmed || !ready.length} onClick={send}>
               {sending ? "Sending…" : `Send ${ready.length} ${mode === "new" ? "invitations" : "reminders"}`}
             </Button>
             {sending && <Button type="button" variant="outline" onClick={() => { cancelled.current = true; }}>Stop after current send</Button>}

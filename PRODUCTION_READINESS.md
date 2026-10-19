@@ -375,3 +375,77 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 - No schema migration or new dependency. Verification used disposable local
   databases and isolated test-only provider doubles. No live Neon data changed,
   real AI requests, email sends, commit, push or deployment were performed.
+
+## Invitation Email Failure Diagnostics (2026-10-18)
+
+- The reported toast was a generic catch-all for missing configuration, provider
+  rejection and ambiguous delivery failures; it did not identify the live cause.
+  The local `.env` has no Resend key/sender. Live Vercel configuration and Resend
+  domain verification could not be inspected without a connected deployment account.
+- Email setup now validates nonempty trimmed RESEND_API_KEY and EMAIL_FROM, a valid
+  sender address/display-name format, and absence of header newlines. Missing or
+  malformed setup is rejected before send-attempt/rate-limit writes or token rotation.
+- The owner Invitations tab shows actionable setup guidance and disables single,
+  resend and bulk-send controls while local configuration is invalid. CSV previews
+  and revocation remain available; no secret configuration values are serialized.
+- Resend failures map to safe, actionable categories: key/permission, restricted
+  test sender, unverified sender domain, quota, rate limit, temporary outage and
+  unconfirmed transport/response. Raw provider bodies, addresses and tokens are
+  neither returned nor logged. Server logs contain only invitation ID, safe category
+  and HTTP status. Unknown failures retain the conservative generic fallback.
+- No provider acceptance is fabricated, no automatic send retry was added, and
+  accepted still does not mean delivered. Network ambiguity requires checking the
+  invitation/provider status before a manual resend after the cooldown.
+- PASS: 112 unit/integration tests; four real-PostgreSQL tests skipped locally.
+- PASS: all 22 isolated-build Chromium tests, production build, TypeScript, lint
+  and whitespace checks. New tests cover provider categories, privacy, missing
+  configuration, existing-link preservation and setup warning/control rendering.
+- No schema migration, live email, live Neon data changes, commit, push or deployment.
+  Production delivery still requires valid server-side credentials and a verified
+  Resend sender domain, followed by a redeploy and an approved real-email check.
+
+## Completed Recording Upload Recovery (2026-10-19)
+
+- Completed mixed audio and its captured timeline are saved to a bounded IndexedDB
+  store before upload. No candidate name/email, transcript text or session token
+  is persisted. Up to three unexpired copies of at most 25 MB each are retained;
+  concurrent saves cannot silently evict older pending recordings. Unavailable,
+  corrupt, blocked, full or quota-limited storage falls back to a visible in-tab
+  copy with a warning not to close/refresh before upload or download.
+- The completion screen shows preparation, finalization, upload progress and server
+  confirmation separately. Feedback no longer implies recording upload succeeded.
+  Temporary network/408/425/429/5xx failures receive at most two automatic retries
+  per attempt; offline attempts pause and enabled recovery resumes on reconnect.
+  Requests have bounded timeouts and abort when the recovery card unmounts.
+- Every attempt first checks a no-store candidate-only acknowledgement endpoint.
+  Saved-but-lost replies are resolved without re-uploading bytes. Finalization is
+  idempotent, and the existing write-once audio/cue transaction remains unchanged.
+  Missing/expired candidate cookies, revoked invitations, deleted responses,
+  expired upload permission and permanent host/type/timing errors cannot be bypassed.
+- `/recording-recovery` restores pending copies without requiring a new interview
+  or accepting new candidates. It works when intake is paused, subject to original
+  session permission. Restored copies require explicit retry. The candidate intro
+  shows a pending-copy notice. Navigation links are hidden while connecting/live.
+  Cards identify copies by preparation time and a short response reference.
+- Confirmed uploads remove the local copy; cleanup failure is reported explicitly.
+  Candidates may download or confirm removal of a local copy without deleting
+  server interview data. Downloads are user-managed and not automatically deleted.
+  Expired/invalid records are removed on recovery access, or at expiry while their
+  card remains open. No worker uploads or deletes browser data while the page is closed.
+- The existing three-hour permission window is not extended. Local preparation
+  must finish before refresh/close; this is not mid-call crash recovery or live-call
+  resume. Browser eviction, cleared storage/cookies, another browser/origin, private
+  browsing and device/network restrictions can prevent recovery. Vercel's 4.5 MB
+  request limit still applies; size rejections offer download rather than endless retry.
+- New consent uses version `2026-10-19-v2` and explains temporary browser storage,
+  expiration and cleanup. Historical consent records are untouched. No schema
+  migration, new dependency, live Neon changes, paid-provider call or live email send.
+- PASS: 130 unit/integration tests; four real-PostgreSQL tests skipped locally.
+- PASS: all 25 isolated-build Chromium tests, including bounded failed uploads,
+  IndexedDB refresh recovery, offline/reconnect, saved-but-lost acknowledgement,
+  expired/invalid copies, missing credentials, download/discard, unavailable/full
+  storage and permanent host-size rejection. Recovered reports retain audio and cues.
+- PASS: production build, TypeScript, clean lint, whitespace check, production
+  bundle test-marker scan and desktop/390px-mobile recovery-page visual review.
+- Browser/device-specific Safari/iOS storage and network behavior still needs
+  staging validation. No commit, push or deployment was performed.

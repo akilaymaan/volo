@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { POST as upload } from "@/app/api/call/recording/route";
+import { GET as status, POST as upload } from "@/app/api/call/recording/route";
 import { cookieName, newToken, tokenHash } from "@/lib/security";
 
 vi.mock("@/lib/db", async () => {
@@ -89,4 +89,32 @@ it("requires the candidate credential and a completed call within the upload win
   await db.update(schema.response).set({ status: "completed", createdAt: new Date(Date.now() - 4 * 60 * 60_000) });
   expect((await upload(request())).status).toBe(410);
   expect(await db.select().from(schema.recording)).toEqual([]);
+});
+
+it("acknowledges a saved upload only to its candidate session without exposing audio or transcripts", async () => {
+  const check = (cookie = `${cookieName("response")}=${token}`) => status(new Request("http://localhost/api/call/recording?responseId=response", { headers: { cookie } }));
+  expect((await check("")).status).toBe(404);
+  expect((await check(`${cookieName("response")}=${newToken()}`)).status).toBe(404);
+  expect(await (await check()).json()).toEqual({ uploaded: false });
+  await upload(request());
+  const confirmed = await check();
+  expect(confirmed.headers.get("cache-control")).toBe("no-store");
+  expect(await confirmed.json()).toEqual({ uploaded: true });
+  await db.update(schema.response).set({ sessionExpiresAt: new Date(0) });
+  expect((await check()).status).toBe(404);
+});
+
+it("does not allow acknowledgement after the upload window or after deletion", async () => {
+  const check = () => status(new Request("http://localhost/api/call/recording?responseId=response", { headers: { cookie: `${cookieName("response")}=${token}` } }));
+  await db.update(schema.response).set({ createdAt: new Date(Date.now() - 4 * 60 * 60_000) });
+  expect((await check()).status).toBe(410);
+  await db.delete(schema.response);
+  expect((await check()).status).toBe(404);
+});
+
+it("rejects recovery acknowledgement after its personal invitation is revoked", async () => {
+  await db.insert(schema.invitation).values({ id: "revoked-invite", interviewId: "role", email: "candidate@example.test", expiresAt: new Date(Date.now() + 60_000), revokedAt: new Date() });
+  await db.update(schema.response).set({ invitationId: "revoked-invite" });
+  const result = await status(new Request("http://localhost/api/call/recording?responseId=response", { headers: { cookie: `${cookieName("response")}=${token}` } }));
+  expect(result.status).toBe(404);
 });

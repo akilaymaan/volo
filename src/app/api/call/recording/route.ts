@@ -10,6 +10,15 @@ export const maxDuration = 60;
 
 const AUDIO_TYPES = ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"] as const;
 
+/** Candidate-only acknowledgement; never exposes recording bytes or report data. */
+export async function GET(req: Request) {
+  const call = await loadCall(new URL(req.url).searchParams.get("responseId") ?? "", req);
+  if (!call) return json({ error: "Not found" }, 404);
+  if (Date.now() - call.response.createdAt.getTime() > 3 * 60 * 60 * 1000)
+    return json({ error: "Upload window closed" }, 410);
+  return json({ uploaded: call.response.hasRecording });
+}
+
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");

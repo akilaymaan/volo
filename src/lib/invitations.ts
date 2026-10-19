@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { candidateAttempt, invitation } from "@/lib/db/schema";
 import { getOwnedInterview } from "@/lib/data";
 import { sendInvitationMail } from "@/lib/mail";
+import { EmailDeliveryError, emailConfiguration } from "@/lib/email-config";
 import { takeRateLimit } from "@/lib/rate-limit";
 import { newToken, tokenHash } from "@/lib/security";
 import { PublicError } from "@/lib/errors";
@@ -24,6 +25,8 @@ export async function sendInvite(ownerId: string, interviewId: string, email: st
   if (iv.isAnonymous) throw new PublicError("Email invitations require named candidate intake.");
   if (iv.allowedEmails.length && !iv.allowedEmails.includes(email))
     throw new PublicError("Add this email to the interview allowlist first, or clear the allowlist.");
+  // Reject known setup problems before creating/rotating a token or consuming a send attempt.
+  emailConfiguration();
   const origin = publicOrigin();
   const [attempt] = await db.select().from(candidateAttempt)
     .where(and(eq(candidateAttempt.interviewId, interviewId), eq(candidateAttempt.email, email)));
@@ -69,10 +72,15 @@ export async function sendInvite(ownerId: string, interviewId: string, email: st
     });
     await db.update(invitation).set({ status: "sent", sentAt: now, providerId: result.id })
       .where(and(eq(invitation.id, sent.id), eq(invitation.tokenHash, tokenHash(token)), eq(invitation.status, "pending")));
-  } catch {
+  } catch (error) {
     await db.update(invitation).set({ status: "failed" })
       .where(and(eq(invitation.id, sent.id), eq(invitation.tokenHash, tokenHash(token)), eq(invitation.status, "pending")));
-    console.error("[invitation:send] delivery failed", { invitationId: sent.id });
+    console.error("[invitation:send] delivery failed", {
+      invitationId: sent.id,
+      code: error instanceof EmailDeliveryError ? error.code : "unconfirmed",
+      status: error instanceof EmailDeliveryError ? error.status : undefined,
+    });
+    if (error instanceof EmailDeliveryError) throw error;
     throw new PublicError("Could not confirm email delivery. Check email configuration and resend after one minute.");
   }
 }

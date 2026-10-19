@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
+import { RecordingRecoveryNotice, RecordingUploadCard } from "@/components/call/recording-recovery";
+import { RECOVERY_WINDOW_MS, saveRecordingDraft, type RecordingDraft } from "@/lib/recording-recovery-store";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,13 +72,14 @@ async function postTurn(form: FormData): Promise<TurnReply> {
   }
 }
 
-function Shell({ interview, children }: { interview: PublicInterview; children: React.ReactNode }) {
+function Shell({ interview, children, recoveryLink = true }: { interview: PublicInterview; children: React.ReactNode; recoveryLink?: boolean }) {
   return (
     <div className="dark flex min-h-dvh flex-col bg-background text-foreground">
       <div className="h-1" style={{ background: interview.themeColor }} />
       {children}
       <p className="pb-4 text-center text-xs text-muted-foreground">
         Powered by <span className="font-heading font-semibold">Volo</span>
+        {recoveryLink && <Link href="/recording-recovery" className="ml-3 underline">Recording recovery</Link>}
       </p>
     </div>
   );
@@ -98,6 +102,9 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
   const [micReady, setMicReady] = useState(false);
   const [micError, setMicError] = useState("");
   const [startedId, setStartedId] = useState("");
+  const [recovery, setRecovery] = useState<{ draft: RecordingDraft; persisted: boolean } | null>(null);
+  const [recordingMessage, setRecordingMessage] = useState("");
+  const uploadExpiresAt = useRef(0);
 
   const engine = useRef<VoiceEngine | null>(null);
   const micStream = useRef<MediaStream | null>(null);
@@ -113,6 +120,12 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
 
   const agentLevel = useCallback(() => engine.current?.agentLevel() ?? 0, []);
   const micLevel = useCallback(() => engine.current?.micLevel() ?? 0, []);
+  const recordingRemoved = useCallback((_id: string, outcome: "saved" | "discarded" | "expired") => {
+    setRecovery(null);
+    setRecordingMessage(outcome === "saved" ? "Recording saved successfully. Its local copy was removed. You can close this tab."
+      : outcome === "expired" ? "The upload window expired. The local recording copy was removed. Contact the hiring team."
+        : "Local recording copy removed. Server-side interview data was not deleted.");
+  }, []);
 
   // ---------- mic check (before the call) ----------
   async function checkMic() {
@@ -197,24 +210,25 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
     const id = responseId.current;
     const recording = await eng?.stopCallRecording().catch(() => null);
     eng?.close();
-    await fetch("/api/call/end", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ responseId: id, tabSwitches: tabRef.current }),
-    }).catch(() => {});
     if (recording && recording.size > 0) {
-      const form = new FormData();
-      form.set("responseId", id);
-      form.set("file", recording, "interview");
       const durationMs = eng?.recordingTimeMs();
-      if (durationMs && durationMs > 0) form.set("timeline", JSON.stringify({
+      const timeline = durationMs && durationMs > 0 ? JSON.stringify({
         version: 1, durationMs,
         turns: [...recordingOffsets.current.entries()].sort(([a], [b]) => a - b)
           .map(([turnIndex, offsetMs]) => ({ turnIndex, offsetMs })),
-      }));
-      await fetch("/api/call/recording", { method: "POST", body: form }).catch(() => {});
+      }) : null;
+      const draft: RecordingDraft = { version: 1, responseId: id, interviewId: interview.id,
+        audio: recording, timeline, tabSwitches: tabRef.current, createdAt: Date.now(), expiresAt: uploadExpiresAt.current };
+      let persisted = false;
+      try { await saveRecordingDraft(draft); persisted = true; } catch { /* Memory-only fallback stays in the ended screen. */ }
+      setRecovery({ draft, persisted });
+    } else {
+      const result = await fetch("/api/call/end", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ responseId: id, tabSwitches: tabRef.current }) }).catch(() => null);
+      setRecordingMessage(result?.ok ? "The interview ended, but this browser did not produce a recording. Contact the hiring team if needed."
+        : "Could not confirm the interview ended. No recording was available to recover. Contact the hiring team.");
     }
-  }, []);
+  }, [interview.id]);
 
   // Hard stop shortly after the planned length, in case the interviewer runs long
   useEffect(() => {
@@ -315,6 +329,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
       responseId.current = data.responseId;
       setStartedId(data.responseId);
       startedAt.current = Date.now();
+      uploadExpiresAt.current = Math.min(typeof data.recordingExpiresAt === "number" ? data.recordingExpiresAt : Infinity, Date.now() + RECOVERY_WINDOW_MS);
       eng.startCallRecording();
       setPhase("live");
       void converse();
@@ -343,13 +358,20 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
 
   useEffect(() => () => engine.current?.close(), []);
 
+  useEffect(() => {
+    if (phase !== "ended" || recovery || recordingMessage) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [phase, recovery, recordingMessage]);
+
   // ---------- render ----------
-  if (phase === "ended") return <Ended interview={interview} responseId={startedId} name={name} />;
+  if (phase === "ended") return <Ended interview={interview} responseId={startedId} name={name} recovery={recovery} recordingMessage={recordingMessage} onRecordingRemoved={recordingRemoved} />;
 
   if (phase === "intro" || phase === "connecting") {
     const formValid = interview.isAnonymous || (name.trim() && /^\S+@\S+\.\S+$/.test(email));
     return (
-      <Shell interview={interview}>
+      <Shell interview={interview} recoveryLink={phase === "intro"}>
         <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center px-4 py-10">
           {interview.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -361,6 +383,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
             A voice conversation with {interview.interviewer.name}, your AI interviewer
           </p>
           {interview.description && <p className="mt-5 text-center leading-relaxed">{interview.description}</p>}
+          {phase === "intro" && <RecordingRecoveryNotice interviewId={interview.id} />}
 
           <ul className="mt-6 grid w-full gap-3 rounded-2xl bg-card p-4 text-sm sm:grid-cols-2">
             <li className="flex items-center gap-2">
@@ -475,7 +498,7 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
         : `${interview.interviewer.name} is speaking`;
 
   return (
-    <Shell interview={interview}>
+    <Shell interview={interview} recoveryLink={false}>
       <div className="h-0.5 bg-muted">
         <div className="h-full bg-mint transition-[width] duration-500" style={{ width: `${Math.min(100, (elapsed / total) * 100)}%` }} />
       </div>
@@ -612,7 +635,11 @@ function MicMeter({ getLevel, active }: { getLevel: () => number; active: boolea
   );
 }
 
-function Ended({ interview, responseId, name }: { interview: PublicInterview; responseId: string; name: string }) {
+function Ended({ interview, responseId, name, recovery, recordingMessage, onRecordingRemoved }: {
+  interview: PublicInterview; responseId: string; name: string;
+  recovery: { draft: RecordingDraft; persisted: boolean } | null; recordingMessage: string;
+  onRecordingRemoved: (id: string, outcome: "saved" | "discarded" | "expired") => void;
+}) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [sent, setSent] = useState(false);
@@ -640,13 +667,15 @@ function Ended({ interview, responseId, name }: { interview: PublicInterview; re
         <h1 className="mt-5 text-3xl font-bold">{responseId ? `Thank you${name ? `, ${name.split(" ")[0]}` : ""}!` : "Interview closed"}</h1>
         <p className="mt-2 text-muted-foreground">
           {responseId
-            ? "You're all done. The hiring team will review your conversation and get back to you."
+            ? "Your interview has ended. Check the recording status below before closing this tab."
             : "You can close this tab."}
         </p>
+        {recovery ? <RecordingUploadCard draft={recovery.draft} persisted={recovery.persisted} autoStart onRemoved={onRecordingRemoved} />
+          : <p role="status" className="mt-4 text-sm">{recordingMessage || "Preparing recording for upload. Keep this tab open…"}</p>}
         {responseId && (
           <div className="mt-10 w-full rounded-2xl bg-card p-5">
             {sent ? (
-              <p className="py-4 font-medium">Thanks for the feedback. You can close this tab.</p>
+              <p className="py-4 font-medium">Thanks for the feedback. Check the recording status above before closing this tab.</p>
             ) : (
               <>
                 <p className="font-medium">How was this interview experience?</p>

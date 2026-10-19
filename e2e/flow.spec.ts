@@ -1,6 +1,7 @@
 import { expect, type BrowserContext, type Page, test } from "@playwright/test";
 import { TEST_USER } from "./fixtures";
 import { CONSENT_VERSION } from "../src/lib/privacy";
+import { RECOVERY_DB, RECOVERY_STORE } from "../src/lib/recording-recovery-store";
 
 // One recruiter journey end to end: sign up → create interview → candidate voice call → report.
 test.describe.configure({ mode: "serial" });
@@ -25,6 +26,37 @@ async function signIn(page: Page) {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   recruiterCookies = await page.context().cookies();
+}
+
+async function recoveryCount(page: Page) {
+  return page.evaluate(async ({ database, store }) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { const request = indexedDB.open(database, 1); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+    return new Promise<number>((resolve, reject) => {
+      const tx = db.transaction(store); const request = tx.objectStore(store).count();
+      tx.oncomplete = () => { db.close(); resolve(request.result); }; tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }, { database: RECOVERY_DB, store: RECOVERY_STORE });
+}
+
+async function completeVoiceInterview(page: Page, name: string, email: string) {
+  await page.goto(`/i/${interviewId}`);
+  await page.getByLabel("Your name").fill(name);
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByRole("button", { name: "Allow microphone" }).click();
+  await expect(page.getByText("Microphone connected", { exact: false })).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Start interview" }).click();
+  const thanks = page.getByRole("heading", { name: `Thank you, ${name.split(" ")[0]}!`, exact: true });
+  const done = page.getByRole("button", { name: "I'm done answering" });
+  const deadline = Date.now() + 60_000;
+  while (!(await thanks.isVisible()) && Date.now() < deadline) {
+    if (await done.isEnabled({ timeout: 500 }).catch(() => false)) {
+      await page.waitForTimeout(700);
+      await done.click({ timeout: 1000 }).catch(() => {});
+    }
+    await page.waitForTimeout(300);
+  }
+  await expect(thanks).toBeVisible();
 }
 
 test("dashboard requires an account", async ({ page }) => {
@@ -70,6 +102,21 @@ test("candidate completes a voice interview", async ({ page }) => {
   // Let the server save one answer, then lose its reply. The replay must retain
   // the original answer's recording position even though userText comes back empty.
   let lostReply = false;
+  let uploads = 0;
+  let blocked = true;
+  let lostUploadReply = false;
+  await page.route("**/api/call/recording**", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    uploads++;
+    if (blocked) return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Temporary outage" }) });
+    if (!lostUploadReply) {
+      lostUploadReply = true;
+      const saved = await route.fetch();
+      expect(saved.status()).toBe(200);
+      return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Lost upload acknowledgement" }) });
+    }
+    await route.continue();
+  });
   await page.route("**/api/call/turn", async (route) => {
     if (!lostReply && route.request().postDataBuffer()?.includes(Buffer.from('name="chunk"'))) {
       lostReply = true;
@@ -105,6 +152,102 @@ test("candidate completes a voice interview", async ({ page }) => {
   await page.getByRole("radio", { name: "5 out of 5" }).click();
   await page.getByRole("button", { name: "Send feedback" }).click();
   await expect(page.getByText("Thanks for the feedback")).toBeVisible();
+  await expect.poll(() => uploads, { timeout: 20_000 }).toBe(3);
+  await expect(page.getByRole("button", { name: "Retry recording upload" })).toBeEnabled();
+  expect(await recoveryCount(page)).toBe(1);
+  await page.reload();
+  await page.getByRole("link", { name: "Open Recording recovery", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Recording recovery", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Recording upload" })).toBeVisible();
+  expect(uploads).toBe(3); // Restored recordings need an explicit retry, not a new interview.
+  await page.screenshot({ path: "test-results/recording-recovery-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/recording-recovery-mobile.png", fullPage: true });
+  await page.context().setOffline(true);
+  await page.getByRole("button", { name: "Retry recording upload" }).click();
+  await expect(page.getByText("You are offline.", { exact: false })).toBeVisible();
+  expect(uploads).toBe(3);
+  blocked = false;
+  await page.context().setOffline(false); // An enabled recovery resumes on reconnect.
+  await expect(page.getByText("Recording saved successfully. Its local copy was removed.", { exact: true })).toBeVisible({ timeout: 20_000 });
+  expect(lostUploadReply).toBe(true);
+  expect(uploads).toBe(4); // A status check resolves the saved-but-lost reply without resending bytes.
+  expect(await recoveryCount(page)).toBe(0);
+});
+
+test("recovery purges expired copies, refuses missing credentials and supports explicit discard", async ({ page }) => {
+  await page.goto("/recording-recovery");
+  await expect(page.getByText("No pending recordings on this browser.", { exact: false })).toBeVisible();
+  await page.evaluate(async ({ database, store }) => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const request = indexedDB.open(database, 1); request.onsuccess = () => resolve(request.result); });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(store, "readwrite");
+      const base = { version: 1, interviewId: "role", audio: new Blob(["test audio"], { type: "audio/webm" }), timeline: null, tabSwitches: 0, createdAt: Date.now() - 1000, expiresAt: Date.now() + 60_000 };
+      tx.objectStore(store).put({ ...base, responseId: "no-session" });
+      tx.objectStore(store).put({ ...base, responseId: "expired", expiresAt: Date.now() - 1 });
+      tx.objectStore(store).put({ ...base, responseId: "invalid", version: 99 });
+      tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }, { database: RECOVERY_DB, store: RECOVERY_STORE });
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Recording upload" })).toHaveCount(1);
+  expect(await recoveryCount(page)).toBe(1);
+  await page.getByRole("button", { name: "Retry recording upload" }).click();
+  await expect(page.getByText("This browser no longer has permission to upload.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry recording upload" })).toBeDisabled();
+  expect(await recoveryCount(page)).toBe(1); // A permanent failure does not silently throw away the only copy.
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download recording" }).click();
+  expect((await download).suggestedFilename()).toBe("interview-recording.webm");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove local copy" }).click();
+  await expect(page.getByText("Local copy removed. Server-side interview data was not deleted.", { exact: true })).toBeVisible();
+  expect(await recoveryCount(page)).toBe(0);
+});
+
+test("unavailable browser storage keeps a memory-only copy and permanent host limits do not retry", async ({ page }) => {
+  await page.addInitScript(() => { Object.defineProperty(window, "indexedDB", { get() { throw new DOMException("Storage disabled", "SecurityError"); } }); });
+  let uploads = 0;
+  await page.route("**/api/call/recording**", (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    uploads++;
+    return route.fulfill({ status: 413, body: "Host size limit" });
+  });
+  await completeVoiceInterview(page, "Storage Denied", "storage-denied@example.test");
+  await expect(page.getByText("Browser storage is unavailable or full.", { exact: false })).toBeVisible();
+  await expect(page.getByText("The recording exceeds this host's upload size limit.", { exact: false })).toBeVisible();
+  expect(uploads).toBe(1);
+  await expect(page.getByRole("button", { name: "Retry recording upload" })).toBeDisabled();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download recording" }).click();
+  expect(await download).toBeTruthy();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove local copy" }).click();
+  await expect(page.getByText("Local recording copy removed.", { exact: false })).toBeVisible();
+});
+
+test("a full recovery store does not evict older pending recordings", async ({ page }) => {
+  await page.goto("/recording-recovery");
+  await expect(page.getByText("No pending recordings on this browser.", { exact: false })).toBeVisible();
+  await page.evaluate(async ({ database, store }) => {
+    const db = await new Promise<IDBDatabase>((resolve) => { const request = indexedDB.open(database, 1); request.onsuccess = () => resolve(request.result); });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(store, "readwrite");
+      for (let i = 0; i < 3; i++) tx.objectStore(store).put({ version: 1, responseId: `older-${i}`, interviewId: "other-role",
+        audio: new Blob(["older test recording"], { type: "audio/webm" }), timeline: null, tabSwitches: 0, createdAt: Date.now(), expiresAt: Date.now() + 60_000 });
+      tx.oncomplete = () => { db.close(); resolve(); }; tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }, { database: RECOVERY_DB, store: RECOVERY_STORE });
+  await page.route("**/api/call/recording**", (route) => route.request().method() === "POST"
+    ? route.fulfill({ status: 413, body: "Host size limit" }) : route.continue());
+  await completeVoiceInterview(page, "Quota Full", "quota-full@example.test");
+  await expect(page.getByText("Browser storage is unavailable or full.", { exact: false })).toBeVisible();
+  await expect(page.getByText("The recording exceeds this host's upload size limit.", { exact: false })).toBeVisible();
+  expect(await recoveryCount(page)).toBe(3);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove local copy" }).click();
+  expect(await recoveryCount(page)).toBe(3);
 });
 
 test("the same email can't take it twice", async ({ request }) => {

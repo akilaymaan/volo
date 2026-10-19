@@ -48,6 +48,8 @@ const makeTurn = (id: string, len: number, cookie: string, silent = false) => {
 };
 
 beforeAll(async () => {
+  vi.stubEnv("RESEND_API_KEY", "test-key");
+  vi.stubEnv("EMAIL_FROM", "hiring@example.test");
   await db.insert(schema.user).values({ id: "owner", name: "Owner", email: "owner@example.test" });
   const [persona] = await db.select().from(schema.interviewer).limit(1);
   await db.insert(schema.interview).values({
