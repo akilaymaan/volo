@@ -45,8 +45,8 @@ export function DashboardHeader({ interviews, isAdmin }: { interviews: Promise<{
     .filter((item) => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   return <>
     <header className={styles.header}>
-      {pathname === "/dashboard" || pathname === "/dashboard/analytics" ? <h1 className={styles.title}>{title}</h1> : <div className={styles.title}>{title}</div>}
-      <div className={styles.headerActions}>
+      {pathname === "/dashboard" || pathname === "/dashboard/analytics" ? <h1 className={styles.title}>{title}</h1> : null}
+      <div className={`${styles.headerActions} ml-auto`}>
         <button type="button" className={styles.quick} aria-label="Search quick actions" onClick={() => { setQuery(""); setOpen(true); }}>
           <SearchIcon size={15} aria-hidden="true" /><span className="flex-1">Quick actions</span><kbd>⌘</kbd><kbd>K</kbd>
         </button>

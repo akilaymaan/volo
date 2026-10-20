@@ -137,6 +137,11 @@
 }
 
 /* Immediate press feedback, without delaying handlers or server requests. */
+/* Initial document entrance: content stays usable while the page settles in. */
+@media (prefers-reduced-motion: no-preference) {
+  body { animation: site-entrance 260ms cubic-bezier(.2,.7,.2,1); }
+}
+@keyframes site-entrance { from { opacity: .7; } to { opacity: 1; } }
 button:not([data-slot="button"]) { transition: background-color 140ms ease-out, color 140ms ease-out, opacity 140ms ease-out, transform 100ms ease-out; }
 button:not([data-slot="button"]):active:not(:disabled) { transform: scale(.98); }
 [data-dashboard-link]:not([data-stretched-link]) { position: relative; }

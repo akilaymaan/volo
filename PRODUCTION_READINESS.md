@@ -804,3 +804,27 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   requests. Mobile analytics screenshot visually reviewed without overflow.
 - Optimized real-provider localhost preview rebuilt. No database migration,
   live Neon writes/provider calls, commit, push or deployment performed.
+
+## Single Titles and Subtle Page Motion (2026-10-20)
+
+- The dashboard toolbar renders a title only on Interviews/Analytics, where the
+  page does not supply its own. Editors, inbox, interviewers, templates, privacy
+  and reports retain their own heading instead of repeating the section name.
+- Added a 420 ms opacity transition on dashboard mount and pathname changes. It does not
+  intercept links, wait before navigation, remount forms, animate query-only
+  filtering or transform ancestors of fixed/sticky controls. No new dependency.
+- Initial document loads use a 260 ms CSS entrance; the document is never hidden.
+  Both effects respect reduced motion; a live preference change cancels any
+  running route effect. Sidebar and toolbar remain stable across navigation.
+- PASS: 45 browser regressions, including single visible titles for the four
+  reported screens, actual route animation invocation, initial entrance,
+  reduced-motion suppression, editable drafts and mobile overflow. Desktop and
+  mobile single-title screenshots visually reviewed.
+- Follow-up: removed the initial-render skip that prevented Enter Volo from
+  animating. The stronger fade starts at 12% opacity instead of 65%; the entry
+  browser test checks actual intermediate opacity and completion at 100%, not
+  just that the animation API was called.
+- PASS: 170 unit/integration tests (four optional PostgreSQL tests skipped), lint,
+  isolated test build and real-provider production build/TypeScript. A parallel
+  unit run hit a process-start timeout; the complete two-worker rerun passed.
+- No database migration, live provider request or deployment required.

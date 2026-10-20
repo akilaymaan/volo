@@ -1,5 +1,6 @@
 import { AppNav } from "@/components/app-nav";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { PageMotion } from "@/components/page-motion";
 import { requireUser } from "@/lib/auth";
 import { isAdminUser } from "@/lib/admin";
 import { inboxInterviews } from "@/lib/review-inbox";
@@ -22,7 +23,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               question generation and live interviews won&apos;t work.
             </div>
           )}
-          {children}
+          <PageMotion>{children}</PageMotion>
         </main>
       </div>
     </div>
