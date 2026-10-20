@@ -1,4 +1,4 @@
-/** Only routes whose render cannot mark a report viewed or schedule provider work. */
+/** Lightweight safe routes only; optional analytics are fetched when opened, not on first entry. */
 const READ_ONLY_ROUTES = new Set([
   "/dashboard", "/dashboard/inbox", "/dashboard/interviewers", "/dashboard/templates",
   "/dashboard/privacy", "/dashboard/interviews/new",

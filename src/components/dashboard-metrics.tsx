@@ -37,10 +37,10 @@ export function DashboardMetrics({ totals, active }: { totals: Awaited<ReturnTyp
       })}</div>
     </section>
     <div className={styles.metricGrid}>
-      <MetricCard title="Average interview length" description="The average length of completed conversations in your selected date range." value={duration} href="#interviews" linkLabel="Browse interviews for duration details" />
+      <MetricCard title="Average interview length" description="The average length of completed conversations in your selected date range." value={duration} href="/dashboard" linkLabel="Browse interviews for duration details" />
       <MetricCard title="Completion rate" description="The share of started interviews that candidates have completed in this period." value={totals.started ? `${Math.round(totals.completed / totals.started * 100)}%` : "—"} href="#activity" linkLabel="View completion activity" />
       <MetricCard title="Average candidate score" description="The average AI score across completed, successfully analyzed interviews. Human decisions stay separate." value={totals.avgScore == null ? "—" : `${totals.avgScore} / 100`} href="/dashboard/inbox" linkLabel="Review candidate reports" />
-      <MetricCard title="Active interviews" description="Live interviews currently accepting candidates, matching your name and status filters. Not date-limited." value={active} href="#interviews" linkLabel="Browse active interviews" />
+      <MetricCard title="Active interviews" description="Live interviews currently accepting candidates, matching your name and status filters. Not date-limited." value={active} href="/dashboard?status=live" linkLabel="Browse active interviews" />
     </div>
   </div>;
 }

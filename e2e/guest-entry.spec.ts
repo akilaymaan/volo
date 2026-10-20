@@ -15,6 +15,8 @@ test("one click opens an isolated real guest workspace and safely resumes the sa
   await expect(page).toHaveURL(/\/dashboard$/);
   expect(starts).toBe(1);
   await expect(page.getByText("Create your first interview", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Getting started", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Interview activity", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "API usage", exact: true })).toHaveCount(0);
   const initial = await (await page.request.get("/api/auth/get-session")).json();
   expect(initial.user.email).toMatch(/^guest-[0-9a-f-]{36}@guest\.volo\.invalid$/);

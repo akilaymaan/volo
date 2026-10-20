@@ -6,10 +6,10 @@ it("allows preloading only explicitly read-only dashboard pages and their fragme
     expect(canPrefetchDashboard(href)).toBe(true);
 });
 
-it("never preloads report views, finalizing interview pages, exports, mutations or query-driven editors", () => {
+it("never preloads expensive analytics, report views, finalizing pages or query-driven editors", () => {
   for (const href of ["/dashboard/interviews/role", "/dashboard/interviews/role/responses/report", "/dashboard/interviews/role/compare",
     "/dashboard/interviews/new?duplicate=private", "/dashboard/interviews/new?template=private", "/api/call/end", "/api/interviews/role/export",
     "/dashboard?ownerId=other", "https://example.test/dashboard", "//example.test/dashboard", "/dashboard/../api/call/end", null, undefined,
-    { pathname: "/dashboard" }, "/dashboard/inbox/extra", "/dashboard/usage", "/dashboard/admin/usage"])
+    { pathname: "/dashboard" }, "/dashboard/inbox/extra", "/dashboard/usage", "/dashboard/admin/usage", "/dashboard/analytics"])
     expect(canPrefetchDashboard(href)).toBe(false);
 });

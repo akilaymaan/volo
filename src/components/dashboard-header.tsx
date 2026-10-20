@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import styles from "@/components/dashboard-shell.module.css";
 
 const destinations = [
-  { name: "Interviews", href: "/dashboard#interviews" }, { name: "New interview", href: "/dashboard/interviews/new" },
+  { name: "Interviews", href: "/dashboard" }, { name: "New interview", href: "/dashboard/interviews/new" },
+  { name: "Analytics", href: "/dashboard/analytics" },
   { name: "Review inbox", href: "/dashboard/inbox" }, { name: "Interviewers", href: "/dashboard/interviewers" },
   { name: "Templates", href: "/dashboard/templates" }, { name: "Privacy and data retention", href: "/dashboard/privacy" },
 ];
@@ -36,7 +37,7 @@ export function DashboardHeader({ interviews, isAdmin }: { interviews: Promise<{
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   }, []);
-  const title = pathname === "/dashboard" ? "Interviews" : pathname.startsWith("/dashboard/inbox") ? "Review inbox"
+  const title = pathname === "/dashboard" ? "Interviews" : pathname.startsWith("/dashboard/analytics") ? "Analytics" : pathname === "/dashboard/interviews/new" ? "New interview" : pathname.startsWith("/dashboard/inbox") ? "Review inbox"
     : pathname.startsWith("/dashboard/interviewers") ? "Interviewers" : pathname.startsWith("/dashboard/templates") ? "Templates"
       : pathname.startsWith("/dashboard/privacy") ? "Privacy and data retention"
         : pathname.startsWith("/dashboard/admin/usage") ? "API usage" : "Interviews";
@@ -44,7 +45,7 @@ export function DashboardHeader({ interviews, isAdmin }: { interviews: Promise<{
     .filter((item) => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   return <>
     <header className={styles.header}>
-      {pathname === "/dashboard" ? <h1 className={styles.title}>{title}</h1> : <div className={styles.title}>{title}</div>}
+      {pathname === "/dashboard" || pathname === "/dashboard/analytics" ? <h1 className={styles.title}>{title}</h1> : <div className={styles.title}>{title}</div>}
       <div className={styles.headerActions}>
         <button type="button" className={styles.quick} aria-label="Search quick actions" onClick={() => { setQuery(""); setOpen(true); }}>
           <SearchIcon size={15} aria-hidden="true" /><span className="flex-1">Quick actions</span><kbd>⌘</kbd><kbd>K</kbd>

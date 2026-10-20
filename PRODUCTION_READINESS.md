@@ -771,3 +771,36 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
 - PASS: all 43 Chromium regressions, including light/dark report styling,
   recording/timestamp/evidence playback, legacy and failed recording handling,
   mobile layouts, comparison, review actions, guest isolation and admin guards.
+
+## Creation-first Minimal Workspace (2026-10-20)
+
+- `/dashboard` is now an interview workspace, not an analytics overview. Accounts
+  with no interviews see a focused welcome panel, an above-the-fold New interview
+  action and a secondary template link. No graph, metric grid or empty-data filter
+  controls compete with first-time setup. The state is derived from owned data,
+  so no onboarding flag/migration or forced editor redirect is required.
+- Returning users see a compact role list, name/status filters, response counts,
+  copy-link controls and New interview. Removed average scores from list rows and
+  switched persona list avatars to neutral styling. Existing row targets still
+  open the interview and copy controls remain independent.
+- Moved date-filtered activity, review distribution, metric cards, chart data table
+  and CSV export to authenticated `/dashboard/analytics`. Scope/form validation
+  and owner-specific queries are preserved. Analytics is excluded from automatic
+  link preloading; the home page no longer imports or calls dashboardAnalytics.
+- Flattened navigation: New interview, Interviews, Review inbox, Templates,
+  Interviewers, Analytics and Privacy. Removed redundant Home/Interviews and nested
+  Activity links. Quick actions, active-route labels, mobile drawer and collapsed
+  sidebar remain functional; metric links return to the interviews workspace.
+- Split lightweight home name/status validation from strict analytics date
+  validation. Old date query parameters do not hide or break interview listings.
+- PASS: 170 unit/integration tests; four optional loopback PostgreSQL tests skipped.
+  Build/TypeScript and lint pass. First-workspace welcome, returning-user list and
+  analytics desktop screenshots visually reviewed. Existing analytics aggregation
+  tests still verify account scope, UTC boundaries, empty results and literal search.
+- PASS: all 43 browser regressions in a clean isolated run, including first-time
+  signup/guest entry, interview creation, search, separate analytics filters/CSV,
+  responsive navigation, admin access, reports and recording recovery. Preloaded
+  Templates/Interviewers/Privacy content opened in 78/92/103 ms with zero additional
+  requests. Mobile analytics screenshot visually reviewed without overflow.
+- Optimized real-provider localhost preview rebuilt. No database migration,
+  live Neon writes/provider calls, commit, push or deployment performed.
