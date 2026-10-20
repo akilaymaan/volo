@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { assertMobileLayout } from "./mobile-assertions";
 
 test("legacy teal interviews use neutral setup, live controls, dialogs and completion", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -28,6 +29,13 @@ test("legacy teal interviews use neutral setup, live controls, dialogs and compl
   const done = page.getByRole("button", { name: "I'm done answering", exact: true });
   await expect(done).toBeEnabled({ timeout: 20_000 });
   await expect(done).toHaveCSS("background-color", "rgb(238, 238, 238)");
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 667, height: 375 }]) {
+    await page.setViewportSize(viewport);
+    await assertMobileLayout(page);
+    await expect(done).toBeInViewport();
+    await page.screenshot({ path: `test-results/mobile-live-interview-${viewport.width}.png` });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: "test-results/candidate-neutral-live.png" });
   await page.getByRole("button", { name: "Show conversation", exact: true }).click();
   const transcript = page.getByRole("dialog");

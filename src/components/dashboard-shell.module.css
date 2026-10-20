@@ -47,9 +47,16 @@
 @media (max-width: 1200px) { .sidebar { width: 170px; } .sidebar.collapsed { width: 62px; } .quick { width: 220px; } }
 @media (max-width: 767px) {
   .stage { padding: 0; } .shell { border-radius: 0; padding: 0; height: auto; min-height: 100dvh; display: block; }
-  .sidebar { display: none; } .panel { border-radius: 0; min-height: 100dvh; padding: 16px; }
-  .mobile { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #000; color: #fff; font-size: 14px; }
+  .sidebar { display: none; } .panel { border-radius: 0; min-height: calc(100dvh - 60px); padding: 20px 16px; overflow-wrap: anywhere; }
+  .mobile { display: flex; align-items: center; justify-content: space-between; min-height: 60px; padding: 8px 16px; background: #000; color: #fff; font-size: 14px; }
+  .mobile button { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 6px; }
+  .mobile button:hover { background: #222; }
+  .headerActions { display: none; }
+  .header:not([data-page-title]) { display: none; }
+  .header { min-height: 28px; margin-bottom: 20px; }
+  .mobileNav { overflow-y: auto; }
+  .mobileNav .navLink { min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
   .header { gap: 8px; } .headerActions { gap: 6px; } .quick { width: 36px; height: 36px; padding: 10px; }
   .quick span, .quick kbd { display: none; }
-  .title { font-size: 20px; } .mobileNav { background: #000; color: #aaa; padding: 20px; } .mobileNav .navSticky { position: static; height: 100%; min-height: 0; } .mobileNav .navLink[aria-current=page]::before { left: -20px; }
+  .title { font-size: 20px; } .mobileNav { background: #000; color: #aaa; padding: 20px; } .mobileNav .navSticky { position: static; height: auto; min-height: min-content; } .mobileNav .navLink[aria-current=page]::before { left: -20px; }
 }

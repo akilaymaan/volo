@@ -3,6 +3,7 @@ import { Logo } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { getUser } from "@/lib/auth";
+import { LandingMobileMenu } from "@/components/landing-mobile-menu";
 
 const STEPS = [
   {
@@ -42,9 +43,10 @@ export default async function Home() {
   const user = await getUser();
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
-        <Logo />
-        <nav className="flex items-center gap-1">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5">
+        <Logo className="shrink-0" />
+        <LandingMobileMenu authenticated={!!user} />
+        <nav aria-label="Main landing navigation" className="hidden items-center gap-1 sm:flex">
           <ThemeToggle />
           {user ? (
             <Button asChild size="lg" className="ml-2">
@@ -64,17 +66,17 @@ export default async function Home() {
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto w-full max-w-4xl px-4 pb-20 pt-10 text-center sm:px-6 lg:pt-16">
+        <section className="mx-auto w-full max-w-4xl px-4 pb-12 pt-8 text-center sm:px-6 sm:pb-20 sm:pt-10 lg:pt-16">
           <div>
-            <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-[1.05] sm:text-6xl">
+            <h1 className="mx-auto max-w-3xl text-[2rem] font-bold leading-[1.12] sm:text-6xl sm:leading-[1.05]">
               First-round interviews, spoken in your candidate&apos;s language.
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
               Paste a job description. Volo writes the questions, runs a live voice interview in
               English or ten Indian languages, and hands you a scored report with the recording and
               transcript.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <div className="mx-auto mt-7 flex max-w-sm flex-col justify-center gap-3 sm:mt-8 sm:max-w-none sm:flex-row sm:flex-wrap">
               <Button asChild size="lg" className="h-11 px-5 text-base">
                 <Link href={user ? "/dashboard/interviews/new" : "/sign-in"}>Create your first interview</Link>
               </Button>

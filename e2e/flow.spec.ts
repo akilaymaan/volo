@@ -2,6 +2,7 @@ import { expect, type BrowserContext, type Page, test } from "@playwright/test";
 import { TEST_USER } from "./fixtures";
 import { CONSENT_VERSION } from "../src/lib/privacy";
 import { RECOVERY_DB, RECOVERY_STORE } from "../src/lib/recording-recovery-store";
+import { assertMobileLayout } from "./mobile-assertions";
 
 // One recruiter journey end to end: sign up → create interview → candidate voice call → report.
 test.describe.configure({ mode: "serial" });
@@ -533,6 +534,9 @@ test("recruiter compares evidence-backed reports for the same role", async ({ pa
   await expect(page.getByRole("columnheader", { name: "Asha Tester" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Sam Compare" })).toBeVisible();
   await expect(page.getByText("3 / 5 assessed").first()).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await assertMobileLayout(page);
+  await page.screenshot({ path: "test-results/mobile-comparison-320.png", fullPage: true });
 });
 
 test("review inbox filters completed candidates without marking reports viewed", async ({ page }) => {
@@ -1052,6 +1056,33 @@ test("all recruiter screens share the edge-to-edge neutral reference theme", asy
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Toggle dark mode" }).click();
+});
+
+test("all recruiter routes remain readable on narrow mobile screens", async ({ page }) => {
+  await signIn(page);
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const [name, path] of [["home", "/dashboard"], ["inbox", "/dashboard/inbox"], ["interviewers", "/dashboard/interviewers"], ["templates", "/dashboard/templates"], ["privacy", "/dashboard/privacy"], ["analytics", "/dashboard/analytics"], ["guided", "/dashboard/interviews/new"], ["interview", `/dashboard/interviews/${interviewId}`], ["editor", `/dashboard/interviews/${interviewId}/edit`], ["report", `/dashboard/interviews/${interviewId}/responses/${reportId}`]]) {
+      await page.goto(path);
+      if (name === "guided") await expect(page.getByRole("button", { name: "Guided setup", exact: true })).toBeVisible();
+      await assertMobileLayout(page);
+      await page.screenshot({ path: `test-results/mobile-audit-${name}-${width}.png`, fullPage: true });
+      if (name === "interview") {
+        for (const tab of ["Insights", "Questions", "Invitations"]) {
+          await page.getByRole("tab", { name: tab, exact: true }).click();
+          await assertMobileLayout(page);
+          await page.screenshot({ path: `test-results/mobile-audit-${tab.toLowerCase()}-${width}.png`, fullPage: true });
+        }
+        await page.getByRole("button", { name: "Share", exact: true }).click();
+        const share = page.getByRole("dialog", { name: "Share with candidates", exact: true });
+        await expect(share).toBeVisible();
+        await assertMobileLayout(page);
+        expect(await share.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+        await page.screenshot({ path: `test-results/mobile-audit-share-${width}.png` });
+        await share.getByRole("button", { name: "Close", exact: true }).click();
+      }
+    }
+  }
 });
 
 test("dashboard account menu signs out without leaving authenticated dashboard access", async ({ page }) => {

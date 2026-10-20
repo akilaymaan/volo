@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 /** Keep setup, call, recovery and unavailable-link screens on the same neutral surface. */
-export function CandidateShell({ children, recoveryLink = true }: { children: React.ReactNode; recoveryLink?: boolean }) {
-  return <div data-candidate-surface="" className="dark flex min-h-dvh flex-col bg-background text-foreground">
+export function CandidateShell({ children, recoveryLink = true, live = false }: { children: React.ReactNode; recoveryLink?: boolean; live?: boolean }) {
+  return <div data-candidate-surface="" data-live-call={live ? "" : undefined} className="dark flex min-h-dvh flex-col bg-background text-foreground">
     <div aria-hidden="true" className="h-1 bg-secondary" />
     {children}
     <p className="pb-4 text-center text-xs text-muted-foreground">

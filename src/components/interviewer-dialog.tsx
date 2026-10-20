@@ -82,7 +82,7 @@ export function InterviewerDialog({
         <div className="space-y-5">
           <div className="flex items-center gap-4">
             <VoiceOrb color={v.color} size={72} />
-            <div className="flex-1 space-y-1.5">
+            <div className="min-w-0 flex-1 space-y-1.5">
               <Label htmlFor="iv-name">Name</Label>
               <Input id="iv-name" value={v.name} maxLength={60} placeholder="Interviewer name" onChange={(e) => set("name", e.target.value)} />
             </div>
@@ -98,12 +98,12 @@ export function InterviewerDialog({
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Voice</Label>
               <div className="flex items-center gap-1">
                 <Select value={v.voice} onValueChange={(x) => set("voice", x)}>
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="min-w-0 flex-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -134,7 +134,7 @@ export function InterviewerDialog({
               </div>
             </div>
           </div>
-          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
             {TRAITS.map((t) => (
               <div key={t.key} className="space-y-2">
                 <div className="flex justify-between text-sm">

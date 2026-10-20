@@ -25,7 +25,7 @@ export default async function ComparePage(props: PageProps<"/dashboard/interview
       {!comparableResponses(rows) ? (
         <p className="rounded-xl border p-5">These reports do not share the same question set, objective, language, duration and rubric version. Compare candidates from the same interview version. Historical responses without an interview snapshot cannot be compared.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
+        <div className="overflow-x-auto rounded-xl border bg-card" role="region" aria-label="Candidate comparison table" tabIndex={0}>
           <table className="w-full text-left text-sm">
             <thead><tr><th className="p-4">Criterion</th>{rows.map((r) => <th key={r.id} className="min-w-60 p-4">
               <Link className="underline" href={`/dashboard/interviews/${id}/responses/${r.id}`}>{r.name || "Anonymous candidate"}</Link>

@@ -62,3 +62,10 @@
   .interviewMeta { grid-column: 1 / -1; justify-content: space-between; gap: 16px; padding-left: 52px; }
 }
 @media (max-width: 360px) { .metricGrid { grid-template-columns: 1fr; } }
+@media (max-width: 480px) {
+  .metricGrid { grid-template-columns: minmax(0, 1fr); }
+  .metric { min-height: 0; }
+  .metricBody { padding: 16px; }
+  .listHeader { flex-wrap: wrap; align-items: flex-start; }
+  .interviewMeta { padding-left: 0; }
+}

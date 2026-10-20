@@ -35,7 +35,9 @@ export function DashboardHeader({ interviews, isAdmin }: { interviews: Promise<{
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setOpen((value) => !value); }
     };
     window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
+    const openSearch = () => { setQuery(""); setOpen(true); };
+    window.addEventListener("volo:quick-actions", openSearch);
+    return () => { window.removeEventListener("keydown", listener); window.removeEventListener("volo:quick-actions", openSearch); };
   }, []);
   const title = pathname === "/dashboard" ? "Interviews" : pathname.startsWith("/dashboard/analytics") ? "Analytics" : pathname === "/dashboard/interviews/new" ? "New interview" : pathname.startsWith("/dashboard/inbox") ? "Review inbox"
     : pathname.startsWith("/dashboard/interviewers") ? "Interviewers" : pathname.startsWith("/dashboard/templates") ? "Templates"
@@ -44,7 +46,7 @@ export function DashboardHeader({ interviews, isAdmin }: { interviews: Promise<{
   const options = [...destinations, ...(isAdmin ? [{ name: "API usage", href: "/dashboard/admin/usage" }] : [])]
     .filter((item) => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   return <>
-    <header className={styles.header}>
+    <header className={styles.header} data-page-title={pathname === "/dashboard" || pathname === "/dashboard/analytics" ? "" : undefined}>
       {pathname === "/dashboard" || pathname === "/dashboard/analytics" ? <h1 className={styles.title}>{title}</h1> : null}
       <div className={`${styles.headerActions} ml-auto`}>
         <button type="button" className={styles.quick} aria-label="Search quick actions" onClick={() => { setQuery(""); setOpen(true); }}>

@@ -14,8 +14,9 @@ export default async function UsagePage() {
     </div>
     <p className="text-sm text-muted-foreground">Estimates are not invoices. Configure per-model rates to price tokens and TTS characters. STT bytes are measured, but duration-based STT costs remain unpriced. Provider failures, automatic SDK retries and fallback billing may not appear. Ledger write failures are logged; these totals are not suitable for enforcing hard spending limits.</p>
     <h2 className="mb-3 mt-8 text-xl font-semibold">Recent usage</h2>
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full text-left text-sm">
+    <p className="mb-2 text-xs text-muted-foreground sm:hidden">Swipe the table to see all columns.</p>
+    <div className="overflow-x-auto rounded-xl border" role="region" aria-label="Recent provider activity" tabIndex={0}>
+      <table className="w-full min-w-[720px] text-left text-sm">
         <thead><tr>{["Date", "Account", "Operation", "Model", "Measured units", "Estimated USD"].map((t) => <th key={t} className="p-3">{t}</th>)}</tr></thead>
         <tbody>{recent.map((r) => <tr key={r.id} className="border-t">
           <td className="p-3">{r.createdAt.toLocaleString()}</td><td className="p-3">{r.accountId ?? "Deleted account"}</td><td className="p-3">{r.operation}</td><td className="p-3">{r.model}</td>

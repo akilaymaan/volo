@@ -484,14 +484,14 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
         : `${interview.interviewer.name} is speaking`;
 
   return (
-    <Shell recoveryLink={false}>
+    <Shell recoveryLink={false} live>
       <div className="h-0.5 bg-muted">
         <div className="h-full bg-foreground transition-[width] duration-500" style={{ width: `${Math.min(100, (elapsed / total) * 100)}%` }} />
       </div>
       <header className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <p className="min-w-0 truncate text-sm font-medium">{interview.name}</p>
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-card px-3 py-1 font-mono text-sm tabular-nums" aria-label="Elapsed time">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-card px-3 py-1 font-mono text-sm tabular-nums" aria-label="Elapsed time">
             {fmt(elapsed)} / {fmt(total)}
           </span>
           <button
@@ -505,9 +505,9 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 pb-6 text-center">
+      <main aria-label="Interview conversation" tabIndex={0} className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 pb-6 text-center">
         <div className={cn("transition-transform duration-500", live === "listening" ? "scale-75" : "scale-100")}>
-          <VoiceOrb color={CANDIDATE_ORB_COLOR} size={240} getLevel={agentLevel} active={live !== "listening"} />
+          <VoiceOrb className="candidate-live-orb" color={CANDIDATE_ORB_COLOR} size={240} getLevel={agentLevel} active={live !== "listening"} />
         </div>
         <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
           {live === "thinking" && <Loader2Icon className="size-3.5 animate-spin" />}
@@ -528,13 +528,13 @@ export function CandidateCall({ interview }: { interview: PublicInterview }) {
       </main>
 
       <footer className="flex flex-col items-center gap-3 px-4 pb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex w-full max-w-md items-center gap-2 sm:gap-3">
           <MicMeter getLevel={micLevel} active={live === "listening"} />
           <button
             type="button"
             disabled={live !== "listening"}
             onClick={() => engine.current?.finishTurn()}
-            className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 font-semibold text-primary-foreground transition-opacity disabled:opacity-30"
+            className="inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-30 sm:px-6 sm:text-base"
           >
             <CheckIcon className="size-5" /> I&apos;m done answering
           </button>

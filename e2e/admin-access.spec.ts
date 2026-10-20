@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { assertMobileLayout } from "./mobile-assertions";
 
 test("recruiter signup cannot grant admin access, including direct URLs and RSC requests", async ({ page }) => {
   await page.goto("/sign-up");
@@ -56,6 +57,10 @@ test("only an allowlisted admin can see platform usage, with retention separate 
   await expect(page.getByText("$1.0000", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Delete expired data", exact: true })).toHaveCount(0);
   await page.screenshot({ path: "test-results/api-usage-admin.png" });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await assertMobileLayout(page);
+  await page.screenshot({ path: "test-results/mobile-admin-usage-320.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/dashboard/usage");
   await expect(page).toHaveURL(/\/dashboard\/admin\/usage$/);
   await page.getByRole("button", { name: "Search quick actions" }).click();

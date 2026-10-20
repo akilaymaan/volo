@@ -22,6 +22,7 @@ Volo runs first-round hiring interviews for you. Paste a job description and Cla
 - Dark mode, mobile layouts, keyboard support, and reduced-motion support.
 - **Sidebar account menu.** Your name and email replace the bottom-left workspace selector. Open the menu for dark mode, privacy/data retention and sign-out; an initials avatar keeps it accessible in the collapsed sidebar, and the mobile navigation drawer includes the same controls. The header contains Quick actions only.
 - **Responsive interactions.** Volo branding stays at the dashboard's top-left, with an icon-only collapsed state and mobile header. Short press/sidebar transitions respect reduced motion. Navigation shows immediate pending feedback, visible safe pages fully preload in production, and dashboard/inbox filters navigate without full-page reloads. Reports and analysis-triggering pages are never prefetched; server/provider operations still require real confirmation and can take time.
+- **Comfortable mobile layouts.** The landing header keeps only the logo and menu on phones; entry, existing-account access and appearance controls are in the menu, with the main CTA in the hero. Dashboard search shares the mobile top bar. Phone layouts use larger touch targets and form text, wrapping interview tabs, stacked invitation forms, readable analytics cards and viewport-bounded scrollable dialogs. Live interview controls stay visible on short screens while the conversation scrolls; wide comparison and admin tables scroll locally.
 
 ## Quick start (about 2 minutes)
 

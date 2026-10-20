@@ -47,7 +47,7 @@ export default async function InterviewersPage() {
             speed: p.speed,
           };
           return (
-            <article key={p.id} className="flex flex-col rounded-2xl border bg-card p-5">
+            <article key={p.id} className="flex min-w-0 flex-col rounded-2xl border bg-card p-4 sm:p-5">
               <div className="flex items-center gap-3">
                 <VoiceOrb color={p.color} size={64} />
                 <div className="min-w-0">

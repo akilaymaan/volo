@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftToLineIcon, ArrowRightFromLineIcon, ChartNoAxesColumnIcon, FilesIcon, InboxIcon, MenuIcon, MessagesSquareIcon, PlusIcon, ShieldCheckIcon, UsersRoundIcon } from "lucide-react";
+import { ArrowLeftToLineIcon, ArrowRightFromLineIcon, ChartNoAxesColumnIcon, FilesIcon, InboxIcon, MenuIcon, MessagesSquareIcon, PlusIcon, SearchIcon, ShieldCheckIcon, UsersRoundIcon } from "lucide-react";
 import { DashboardLink as Link } from "@/components/dashboard-link";
 import { Logo } from "@/components/brand";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
@@ -50,6 +50,8 @@ export function AppNav({ name, email, isAdmin }: { name: string; email: string; 
     </aside>
     <div className={styles.mobile}>
       <Logo href="/dashboard" inverted className={styles.mobileBrand} />
+      <div className="ml-auto flex items-center gap-2">
+      <button type="button" aria-label="Search quick actions" onClick={() => window.dispatchEvent(new Event("volo:quick-actions"))}><SearchIcon size={19} /></button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger aria-label="Open menu"><MenuIcon size={19} /></SheetTrigger>
         <SheetContent side="left" className={cn("w-64", styles.mobileNav)}>
@@ -59,6 +61,7 @@ export function AppNav({ name, email, isAdmin }: { name: string; email: string; 
           </div>
         </SheetContent>
       </Sheet>
+      </div>
     </div>
   </>;
 }

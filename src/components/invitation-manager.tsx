@@ -33,11 +33,11 @@ export function InvitationManager({ interviewId, rows, setupError = null }: { in
         <p className="mt-2 text-muted-foreground">On Vercel, set these under Project Settings → Environment Variables for Production, then redeploy. EMAIL_FROM must use your verified Resend domain, not a personal Gmail address.</p>
       </div>}
       <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={(e) => { e.preventDefault(); send(email); }}>
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 basis-full space-y-1 sm:basis-0">
           <Label htmlFor="invite-email">Candidate email</Label>
           <Input id="invite-email" type="email" required maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <Button disabled={pending || !!setupError} type="submit">Send invitation</Button>
+        <Button className="w-full sm:w-auto" disabled={pending || !!setupError} type="submit">Send invitation</Button>
       </form>
       <BulkInvitationImport interviewId={interviewId} sendingDisabled={!!setupError} />
       <ul aria-label="Invitations" className="mt-5 divide-y">

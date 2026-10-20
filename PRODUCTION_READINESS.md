@@ -866,3 +866,40 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   access controls, themes and transitions. Safe preloaded pages open in 89–105 ms
   with zero additional requests. Optimized localhost preview rebuilt/restarted;
   no live Neon writes, provider calls, commit, push or deployment performed.
+
+## Mobile Layout and Congestion Audit (2026-10-20)
+
+- Landing: replaced the crowded mobile action row with logo/menu. Entry, existing
+  account and theme controls remain reachable in the accessible drawer. The hero
+  retains its primary CTA above the fold at tested phone widths; desktop retains
+  its original navigation. Reduced mobile headline/copy density and stacked CTAs.
+- Dashboard: search now shares the mobile brand/menu bar instead of consuming an
+  extra empty toolbar row. Pages keep a single title. Mobile drawers scroll on
+  short viewports; primary controls have 44 px touch targets and form fields use
+  16 px text. Desktop navigation, shortcuts and account controls stay available.
+- Improved narrow-screen analytics/list filters, stacked metric cards, candidate
+  filters, two-column interview tabs and full-width invitation fields/actions.
+  Long select labels are constrained rather than expanding forms. Dialogs and
+  confirmations are bounded by the dynamic viewport with local scrolling; nested
+  interviewer grids have explicit shrinkable columns. Wide comparison/admin
+  tables remain readable in keyboard-focusable local scroll regions.
+- Candidate live calls use a viewport-height mobile shell with a scrollable
+  conversation and non-overlapping footer controls. The timer stays on one line;
+  decorative orbs shrink, and landscape uses a compact side-by-side layout. Call
+  engine, recording, consent and submission behavior are unchanged.
+- Added viewport/text-size checks and screenshots across main recruiter routes,
+  all interview tabs, sharing, comparison, admin usage, guided/full creation,
+  landing/menu, guest/account entry, signup, candidate setup/live/closed/invalid
+  states and recording recovery. Widths include 320/360/390/430 px and a short
+  667 × 375 landscape viewport. No broad horizontal-overflow hiding is used to
+  conceal broken layouts. Long-dialog actions are checked for reachability.
+- PASS: final full 55-test Chromium suite, 176 unit/integration tests (four optional
+  PostgreSQL tests skipped), lint, TypeScript and optimized real-provider build.
+  Mobile screenshots visually reviewed for landing/menu, admin data, dialogs,
+  interview management/invitations, analytics and portrait/landscape live calls.
+  Narrow-screen route tests include readable form fonts and no page overflow;
+  long dialogs additionally verify their own internal width and reachable actions.
+- UI-only mobile tests reuse a seeded account so the expanded suite does not
+  exhaust the unchanged production guest-signup quota. No auth/rate-limit bypass,
+  new provider mock, migration or live Neon/provider operation was added. Localhost
+  preview rebuilt/restarted. Changes are not committed, pushed or deployed.
