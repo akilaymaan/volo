@@ -28,6 +28,7 @@ test("one click opens an isolated real guest workspace and safely resumes the sa
   await page.reload();
   await expect(page.getByRole("button", { name: "Account menu", exact: true })).toContainText("Guest workspace");
   await page.getByRole("link", { name: "New interview", exact: true }).first().click();
+  await page.getByRole("button", { name: "Full editor", exact: true }).click();
   await page.getByLabel("Interview name").fill("Guest private interview");
   await page.getByLabel("Objective").fill("Check relevant skills");
   await page.getByRole("button", { name: "Generate", exact: true }).click();

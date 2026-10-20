@@ -828,3 +828,41 @@ Scheduling/ATS and object storage follow demonstrated demand or scale.
   isolated test build and real-provider production build/TypeScript. A parallel
   unit run hit a process-start timeout; the complete two-worker rerun passed.
 - No database migration, live provider request or deployment required.
+
+## Guided Interview Creation and Local Drafts (2026-10-20)
+
+- New blank interviews default to three steps: describe the role/job description,
+  review/edit questions plus interviewer/language/duration, and review candidate
+  appearance/access/retention before creating and sharing. Questions may be
+  generated explicitly or entered manually. Forward steps validate required
+  content; Back preserves values. Only the final step creates the interview.
+- Guided setup and Full editor use the same form state and server action.
+  Switching modes preserves values. Existing interview editing stays full-only;
+  template/duplicate starts default to full mode and retain source access rules.
+- New-interview drafts debounce to browser localStorage, with page-exit/navigation
+  flushing, seven-day recovery expiry, version/shape/size validation and a key
+  scoped to both authenticated workspace and source. Draft fields include role,
+  questions, generation notes/count, settings (including uploaded logos), mode and
+  step. Job-description file bytes are never persisted; restored names prompt
+  reattachment before generation.
+- Local drafts are not encrypted or synced across devices; the editor discloses
+  shared-device risks and expiry cleanup on reopening. Failed/unavailable storage
+  never claims success and does not block manual creation. Stale-tab writes are
+  refused rather than silently replacing newer saved content; merely restoring a
+  draft does not rewrite it. Server ownership and creation validation stay intact.
+- Failed creation retains the draft. Successful creation removes only the matching
+  unchanged local draft and stops queued writes; cleanup failure warns the user.
+  Explicit discard requires confirmation. Existing interviews are not changed by
+  draft autosave. No schema migration, production demo or mock provider added.
+- PASS: 176 unit/integration tests (four optional PostgreSQL tests skipped), lint,
+  isolated E2E build and real-provider production build/TypeScript. Six focused
+  browser tests verify guided/manual/full creation, saved values in the real
+  editor, navigation/reload recovery, attachment notices, failed creation retention,
+  storage read/write failures, stale-tab conflicts, corrupt data, guest isolation
+  and confirmed discard. Desktop/mobile guided screenshots visually reviewed;
+  creation buttons no longer overlap a preview below the fold.
+- PASS: final complete 51-test browser suite, including existing reports,
+  candidate recording/recovery, email invitations, review inbox, templates/copying,
+  access controls, themes and transitions. Safe preloaded pages open in 89–105 ms
+  with zero additional requests. Optimized localhost preview rebuilt/restarted;
+  no live Neon writes, provider calls, commit, push or deployment performed.

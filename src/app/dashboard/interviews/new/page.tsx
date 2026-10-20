@@ -6,6 +6,7 @@ import { getOwnedInterview, listInterviewers } from "@/lib/data";
 import { reusableInterviewConfig } from "@/lib/interview-config";
 import { getOwnedTemplate } from "@/lib/templates";
 import type { InterviewInput } from "@/app/actions";
+import { interviewDraftKey } from "@/lib/interview-draft";
 
 export const metadata = { title: "New interview" };
 
@@ -45,7 +46,7 @@ export default async function NewInterview(props: PageProps<"/dashboard/intervie
           {missingPersona && <p className="mt-2 text-destructive">The saved interviewer is no longer available. Choose an interviewer below.</p>}
         </div>
       ) : <p className="mb-6 text-sm"><Link href="/dashboard/templates" className="underline underline-offset-4">Start from a saved template</Link></p>}
-      <InterviewEditor key={`${template ?? ""}:${duplicate ?? ""}`} interviewId={null} initial={initial} interviewers={interviewers} />
+      <InterviewEditor key={`${template ?? ""}:${duplicate ?? ""}`} interviewId={null} initial={initial} interviewers={interviewers} draftKey={interviewDraftKey(user.id, template ? `template:${template}` : duplicate ? `duplicate:${duplicate}` : "new")} />
     </>
   );
 }

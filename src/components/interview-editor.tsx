@@ -35,6 +35,8 @@ import { LANGUAGES } from "@/lib/constants";
 import { CANDIDATE_ORB_COLOR } from "@/lib/candidate-appearance";
 import type { Interviewer } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+import { guidedStepError, type InterviewDraftState } from "@/lib/interview-draft";
+import { useInterviewDraft } from "@/components/use-interview-draft";
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -50,10 +52,12 @@ export function InterviewEditor({
   interviewId,
   initial,
   interviewers,
+  draftKey,
 }: {
   interviewId: string | null;
   initial?: InterviewInput;
   interviewers: Interviewer[];
+  draftKey?: string;
 }) {
   const router = useRouter();
   const [v, setV] = useState<InterviewInput>(
@@ -78,14 +82,32 @@ export function InterviewEditor({
 
   const [context, setContext] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [count, setCount] = useState(initial?.questions.length || 5);
+  const [count, setCount] = useState(Math.min(initial?.questions.length || 5, 12));
   const [emailsText, setEmailsText] = useState((initial?.allowedEmails ?? []).join("\n"));
+  const [guided, setGuided] = useState(!!draftKey && !initial);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [stepError, setStepError] = useState("");
+  const [attachmentName, setAttachmentName] = useState("");
   const [generating, startGenerating] = useTransition();
   const [saving, startSaving] = useTransition();
   const logoInput = useRef<HTMLInputElement>(null);
   const persona = interviewers.find((i) => i.id === v.interviewerId);
+  const draftState: InterviewDraftState = { values: v, context, count, emailsText, guided, step, attachmentName: file?.name ?? attachmentName };
+  const draft = useInterviewDraft(draftKey, draftState, (saved) => {
+    setV({ ...saved.values, interviewerId: interviewers.some((p) => p.id === saved.values.interviewerId) ? saved.values.interviewerId : "" });
+    setContext(saved.context); setCount(saved.count); setEmailsText(saved.emailsText);
+    setStep(saved.step); setGuided(saved.guided); setAttachmentName(saved.attachmentName);
+  });
+
+  function goTo(next: 1 | 2 | 3) {
+    const error = next > step ? guidedStepError(draftState, next === 3 ? 2 : 1) : "";
+    if (error) { setStepError(error); return; }
+    setStepError(""); setStep(next);
+    requestAnimationFrame(() => document.getElementById("interview-flow-title")?.focus());
+  }
 
   function generate() {
+    if (attachmentName && !file) return void toast.error("Reattach your saved file or remove the attachment reminder before generating.");
     const form = new FormData();
     form.set("name", v.name);
     form.set("objective", v.objective);
@@ -100,6 +122,7 @@ export function InterviewEditor({
         questions: res.questions.map((q) => ({ id: nanoid(8), question: q, followUps: 1 })),
         description: p.description || res.description,
       }));
+      if (guided) { setStep(2); setStepError(""); requestAnimationFrame(() => document.getElementById("interview-flow-title")?.focus()); }
       toast.success(`Drafted ${res.questions.length} questions. Edit anything you like.`);
     });
   }
@@ -122,6 +145,10 @@ export function InterviewEditor({
   }
 
   function save() {
+    if (guided) {
+      const error = guidedStepError(draftState, 2);
+      if (error || !persona) { setStepError(error || "Choose an available interviewer."); setStep(2); return; }
+    }
     const allowedEmails = emailsText
       .split(/[\s,;]+/)
       .map((e) => e.trim().toLowerCase())
@@ -129,6 +156,7 @@ export function InterviewEditor({
     startSaving(async () => {
       const res = await saveInterviewAction(interviewId, { ...v, allowedEmails });
       if (!res.ok) return void toast.error(res.error);
+      if (draftKey && !draft.clear()) toast.warning("Interview created, but the local draft could not be removed. Clear it before starting another interview.");
       toast.success(interviewId ? "Changes saved" : "Interview created");
       router.push(`/dashboard/interviews/${res.id}${interviewId ? "" : "?share=1"}`);
       router.refresh();
@@ -137,10 +165,36 @@ export function InterviewEditor({
 
   const canGenerate = v.name.trim() && v.objective.trim();
 
+  if (!draft.ready) return <p role="status" className="py-8 text-sm text-muted-foreground">Loading saved draft…</p>;
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <>
+    {draftKey && <div className="mb-6 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div role="group" aria-label="Interview editor mode" className="flex gap-1 rounded-lg border p-1">
+          <Button variant={guided ? "secondary" : "ghost"} size="sm" type="button" aria-pressed={guided} disabled={saving || generating} onClick={() => setGuided(true)}>Guided setup</Button>
+          <Button variant={!guided ? "secondary" : "ghost"} size="sm" type="button" aria-pressed={!guided} disabled={saving || generating} onClick={() => { setGuided(false); setStepError(""); }}>Full editor</Button>
+        </div>
+        <Button type="button" variant="ghost" size="sm" disabled={saving || generating} onClick={() => {
+          if (!window.confirm("Discard this interview draft and start again? This only removes this draft from this device.")) return;
+          if (!draft.clear()) return void toast.error("Draft could not be discarded. It may have changed in another tab.");
+          window.location.reload();
+        }}>Discard draft</Button>
+      </div>
+      {draft.restored && <p className="text-sm font-medium">Saved draft restored. Review it before creating your interview.</p>}
+      <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{draft.status}</p>
+      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">About draft privacy</summary><p className="mt-2">Stored in this browser, not synced across devices. Avoid sensitive information on shared devices. Expired drafts are removed when you next open this editor.</p></details>
+      {attachmentName && !file && <div role="alert" className="rounded-lg border p-3 text-sm">Reattach “{attachmentName}” to use it for question generation. <button type="button" className="underline" onClick={() => setAttachmentName("")}>Remove attachment reminder</button></div>}
+    </div>}
+    {guided && <div className="mb-6 space-y-4">
+      <nav aria-label="Interview setup progress"><ol className="grid grid-cols-3 gap-2">{["Describe the role", "Review questions", "Launch and share"].map((label, index) => <li key={label}><button type="button" aria-current={step === index + 1 ? "step" : undefined} disabled={saving || generating} onClick={() => goTo((index + 1) as 1 | 2 | 3)} className={cn("w-full rounded-lg border p-3 text-left text-xs sm:text-sm", step === index + 1 ? "border-primary bg-secondary font-medium" : "text-muted-foreground")}><span className="mb-1 block text-xs">Step {index + 1}</span>{label}</button></li>)}</ol></nav>
+      <h2 id="interview-flow-title" tabIndex={-1} className="text-xl font-semibold outline-none">{["Describe the role", "Review your questions and format", "Review, launch and share"][step - 1]}</h2>
+      {step === 3 && <p className="text-sm text-muted-foreground">{v.name} · {v.questions.length} questions · {v.durationMins} minutes. Creating the interview opens its sharing options; it does not send email invitations.</p>}
+    </div>}
+    {stepError && <p role="alert" className="mb-4 rounded-lg border border-destructive/40 p-3 text-sm">{stepError}</p>}
+    <div className={cn("grid gap-6", (!guided || step === 3) && "lg:grid-cols-[minmax(0,1fr)_320px]")}>
       <div className="space-y-6">
-        <Section title="The role" hint="Only you see the objective. The AI uses it to decide what to dig into.">
+        {(!guided || step === 1) && <Section title="The role" hint="Only you see the objective. The AI uses it to decide what to dig into.">
           <div className="space-y-1.5">
             <Label htmlFor="name">Interview name</Label>
             <Input
@@ -158,33 +212,35 @@ export function InterviewEditor({
               id="objective"
               value={v.objective}
               rows={3}
+              maxLength={4000}
               placeholder="Describe the skills and experience this interview should assess."
               onChange={(e) => set("objective", e.target.value)}
             />
           </div>
-        </Section>
+        </Section>}
 
-        <Section
-          title="Questions"
+        {(!guided || step !== 3) && <Section
+          title={guided && step === 1 ? "Job description" : "Questions"}
           hint="Generate a draft from the job description, then edit freely. The interviewer asks them in order and adds follow-ups."
         >
           <div className="rounded-xl bg-muted/60 p-4">
             <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-              <div className="space-y-1.5">
+              {(!guided || step === 1) && <div className="space-y-1.5">
                 <Label htmlFor="context">Job description (optional)</Label>
                 <Textarea
                   id="context"
                   value={context}
                   rows={3}
+                  maxLength={30000}
                   placeholder="Paste the job description or notes here, or attach a PDF."
                   onChange={(e) => setContext(e.target.value)}
                   className="bg-background"
                 />
                 <div className="flex flex-wrap items-center gap-2">
                   {file ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-sm">
-                      <FileTextIcon className="size-4" /> {file.name}
-                      <button type="button" aria-label="Remove file" onClick={() => setFile(null)}>
+                    <span className="inline-flex max-w-full items-center gap-1.5 rounded-md bg-background px-2 py-1 text-sm">
+                      <FileTextIcon className="size-4 shrink-0" /><span className="min-w-0 break-all">{file.name}</span>
+                      <button type="button" aria-label="Remove file" onClick={() => { setFile(null); setAttachmentName(""); }}>
                         <XIcon className="size-3.5" />
                       </button>
                     </span>
@@ -200,7 +256,7 @@ export function InterviewEditor({
                     </Label>
                   )}
                 </div>
-              </div>
+              </div>}
               <div className="flex flex-col justify-end gap-2 sm:w-44">
                 <div className="space-y-1.5">
                   <Label>How many questions</Label>
@@ -228,7 +284,7 @@ export function InterviewEditor({
             )}
           </div>
 
-          {v.questions.length > 0 && (
+          {(!guided || step === 2) && v.questions.length > 0 && (
             <ol className="space-y-3">
               {v.questions.map((q, i) => (
                 <li key={q.id} className="flex gap-3 rounded-xl border bg-background p-3">
@@ -239,6 +295,7 @@ export function InterviewEditor({
                     <Textarea
                       value={q.question}
                       rows={2}
+                      maxLength={500}
                       aria-label={`Question ${i + 1}`}
                       onChange={(e) => updateQuestion(i, { question: e.target.value })}
                       className="min-h-0 resize-none border-0 p-1 shadow-none focus-visible:ring-1"
@@ -275,16 +332,17 @@ export function InterviewEditor({
               ))}
             </ol>
           )}
-          <Button
+          {(!guided || step === 2) && <Button
             type="button"
             variant="outline"
+            disabled={v.questions.length >= 25 || generating}
             onClick={() => set("questions", [...v.questions, { id: nanoid(8), question: "", followUps: 1 }])}
           >
             <PlusIcon /> Add a question
-          </Button>
-        </Section>
+          </Button>}
+        </Section>}
 
-        <Section title="Interviewer and format">
+        {(!guided || step === 2) && <Section title="Interviewer and format">
           <div role="radiogroup" aria-label="Interviewer" className="grid gap-3 sm:grid-cols-2">
             {interviewers.map((p) => {
               const selected = p.id === v.interviewerId;
@@ -351,9 +409,9 @@ export function InterviewEditor({
               <p className="text-xs text-muted-foreground">The interviewer wraps up when time runs out.</p>
             </div>
           </div>
-        </Section>
+        </Section>}
 
-        <Section title="What candidates see" hint="Shown on the page candidates open before they start.">
+        {(!guided || step === 3) && <Section title="What candidates see" hint="Shown on the page candidates open before they start.">
           <div className="space-y-1.5">
             <Label htmlFor="description">Intro for candidates</Label>
             <Textarea
@@ -395,9 +453,9 @@ export function InterviewEditor({
               </div>
             </div>
           </div>
-        </Section>
+        </Section>}
 
-        <Section title="Access">
+        {(!guided || step === 3) && <Section title="Access">
           <div className="flex items-start justify-between gap-4">
             <div>
               <Label htmlFor="anon">Anonymous responses</Label>
@@ -417,6 +475,7 @@ export function InterviewEditor({
                 id="emails"
                 rows={3}
                 value={emailsText}
+                maxLength={500000}
                 placeholder="Leave empty to let anyone with the link respond. Or paste emails, one per line."
                 onChange={(e) => setEmailsText(e.target.value)}
               />
@@ -428,10 +487,10 @@ export function InterviewEditor({
             <Input id="retention-days" type="number" min={1} max={3650} value={v.retentionDays} onChange={(e) => set("retentionDays", Number(e.target.value))} />
             <p className="text-xs text-muted-foreground">Applies to new responses. Scheduled cleanup must be configured by your administrator. Existing records are not silently deleted.</p>
           </div>
-        </Section>
+        </Section>}
       </div>
 
-      <aside className="lg:sticky lg:top-8 lg:self-start">
+      {(!guided || step === 3) && <aside className="lg:sticky lg:top-8 lg:self-start">
         <p className="mb-2 text-sm font-medium text-muted-foreground">Candidate preview</p>
         <div data-candidate-preview="" className="dark overflow-hidden rounded-lg border bg-background text-foreground">
           <div className="h-1 bg-secondary" />
@@ -441,7 +500,7 @@ export function InterviewEditor({
               <img src={v.logoUrl} alt="" className="mb-3 h-8 max-w-36 object-contain" />
             )}
             <VoiceOrb color={CANDIDATE_ORB_COLOR} size={110} />
-            <p className="font-heading text-lg font-semibold leading-tight">{v.name || "Interview name"}</p>
+            <p className="max-w-full break-words font-heading text-lg font-semibold leading-tight">{v.name || "Interview name"}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               With {persona?.name ?? "your interviewer"}, about {v.durationMins} min
             </p>
@@ -456,7 +515,7 @@ export function InterviewEditor({
           </div>
         </div>
 
-        <div className="sticky bottom-0 mt-4 flex gap-2 bg-background/90 py-3 backdrop-blur lg:bg-transparent">
+        <div className="mt-4 flex gap-2 bg-background py-3">
           <Button type="button" variant="outline" className="h-10" onClick={() => router.back()}>
             Cancel
           </Button>
@@ -465,7 +524,12 @@ export function InterviewEditor({
             {interviewId ? "Save changes" : "Create interview"}
           </Button>
         </div>
-      </aside>
+      </aside>}
     </div>
+    {guided && <div className="mt-6 flex items-center justify-between gap-3 border-t pt-4">
+      <Button type="button" variant="outline" disabled={saving || generating || step === 1} onClick={() => goTo((step - 1) as 1 | 2)}>Back</Button>
+      {step < 3 && <Button type="button" disabled={saving || generating} onClick={() => goTo((step + 1) as 2 | 3)}>{step === 1 ? "Continue to questions" : "Review and launch"}</Button>}
+    </div>}
+    </>
   );
 }

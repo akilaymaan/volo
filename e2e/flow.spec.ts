@@ -91,6 +91,7 @@ test("recruiter signs up and creates an interview", async ({ page }) => {
   await page.screenshot({ path: "test-results/first-interview-welcome.png", fullPage: true });
 
   await page.getByRole("link", { name: "New interview" }).first().click();
+  await page.getByRole("button", { name: "Full editor", exact: true }).click();
   await page.getByLabel("Interview name").fill("Frontend Engineer screen");
   await page.getByLabel("Objective").fill("Find React engineers who ship production apps.");
   await page.getByRole("button", { name: "Generate" }).click();
@@ -575,6 +576,7 @@ test("review inbox filters completed candidates without marking reports viewed",
 test("inbox shows failed analysis across interviews and retries only after confirmation", async ({ page }) => {
   await signIn(page);
   await page.goto("/dashboard/interviews/new");
+  await page.getByRole("button", { name: "Full editor", exact: true }).click();
   await page.getByLabel("Interview name").fill("Inbox analysis failure");
   await page.getByLabel("Objective").fill("Check explicit analysis retry behavior.");
   await page.getByRole("button", { name: "Generate", exact: true }).click();
@@ -1032,6 +1034,7 @@ test("all recruiter screens share the edge-to-edge neutral reference theme", asy
     expect(await page.getByRole("complementary", { name: "Sidebar" }).evaluate((node) => node.getBoundingClientRect().left)).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (name === "editor") {
+      await page.getByRole("button", { name: "Full editor", exact: true }).click();
       const preview = page.locator("[data-candidate-preview]");
       await expect(preview).toHaveCSS("background-color", "rgb(22, 22, 22)");
       await expect(preview.getByText("Start interview", { exact: true })).toHaveCSS("background-color", "rgb(238, 238, 238)");
